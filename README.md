@@ -26,6 +26,7 @@ The design bias in this document is:
 - Set the MDM user scope intentionally. Do not leave automatic enrollment behavior to defaults or overlap it carelessly with WIP scope.
 - Establish naming standards, RBAC boundaries, scope tags, dynamic group strategy, and assignment filter rules before broad rollout.
 - Build pilot rings for enrollment, apps, security baselines, compliance, and Windows servicing before production targeting.
+- Define a Windows configuration profile strategy (Settings Catalog first, templates only when needed) before broad assignments.
 - Standardize Win32 packaging, detection rules, uninstall paths, dependencies, supersedence, and restart behavior.
 - Define the co-management exit plan before moving workloads.
 - Configure compliance first, test Conditional Access in report-only mode, and enforce only after pilot validation.
@@ -171,6 +172,58 @@ Co-management rules:
 - Pilot every workload shift.
 - Document the exit criteria for every retained Configuration Manager dependency.
 - Do not leave workloads split indefinitely without a retirement plan.
+
+## Windows Configuration Profiles Best Practices
+
+For Windows, configuration profiles are the day-to-day policy delivery mechanism for device posture, UX standards, and operational controls. Treat profile design as an engineering system, not a one-time setup.
+
+### Design Model
+
+- Use Settings Catalog as the default authoring path for new Windows policy where possible.
+- Use template-based profiles only when they provide a clear operational advantage.
+- Keep one authoritative source per setting family to reduce conflicts across Settings Catalog, Administrative Templates, security baselines, and endpoint security policies.
+- Prefer reusable profile layers:
+	- Foundation baseline layer (tenant-wide standards)
+	- Persona layer (corporate, shared, frontline, kiosk, EDU)
+	- Exception layer (time-bounded and owner-approved)
+
+### Assignment and Targeting Strategy
+
+- Prefer device-based assignment for machine controls and shared-device scenarios.
+- Use user-based assignment only when settings are truly user-context controls.
+- Use assignment filters to refine targeting instead of cloning near-identical groups.
+- Roll out profiles in rings (pilot -> broad -> holdback) with explicit success and rollback criteria.
+- Keep assignment intent simple and auditable; avoid overlapping broad assignments that are hard to troubleshoot.
+
+### Naming, Versioning, and Ownership
+
+- Standardize naming so each profile includes platform, scope, purpose, and version (for example: `WIN11-DEVICE-BASELINE-v3`).
+- Assign an owner and review cadence to every profile.
+- Document change reason, expected impact, and rollback path before promotion from pilot to broad.
+- Retire deprecated profiles promptly to avoid assignment drift and stale policy conflicts.
+
+### Conflict and Drift Prevention
+
+- Avoid managing the same setting from multiple policy channels unless intentionally documented.
+- Review policy conflict reports and remediation states on a fixed cadence.
+- Validate baseline and endpoint security overlaps before enabling broad assignments.
+- Keep exception debt visible: every exception should have business owner, expiry date, and review date.
+
+### Operational Rollout Checklist (Windows Profiles)
+
+- Validate prerequisites (enrollment state, edition support, and licensing dependencies).
+- Test settings in a pilot ring with representative hardware and business apps.
+- Confirm reboot behavior, user impact, and help-desk readiness before broad rollout.
+- Monitor deployment status, error codes, and remediation trends daily during rollout waves.
+- Freeze expansion when repeated failures exceed threshold, then run root-cause analysis.
+
+### Common Windows Profile Anti-Patterns
+
+- Creating many near-duplicate profiles per business unit with no lifecycle owner.
+- Mixing device and user settings in the same rollout without clear scope intent.
+- Deploying broad assignments before pilot telemetry is stable.
+- Allowing legacy GPO intent to be copied directly without cloud-era simplification.
+- Leaving old profiles assigned after replacement, causing unpredictable effective settings.
 
 ## App Lifecycle and Win32 Packaging
 
@@ -519,6 +572,9 @@ Official Microsoft Learn references used to align this guide:
 | Microsoft Defender tamper protection overview | https://learn.microsoft.com/en-us/defender-endpoint/prevent-changes-to-security-settings-with-tamper-protection |
 | App protection policy overview | https://learn.microsoft.com/en-us/intune/intune-service/apps/app-protection-policy |
 | App-based Conditional Access | https://learn.microsoft.com/en-us/intune/intune-service/protect/app-based-conditional-access-intune-create |
+| Windows device profiles overview | https://learn.microsoft.com/en-us/intune/intune-service/configuration/device-profiles |
+| Settings Catalog in Intune | https://learn.microsoft.com/en-us/intune/intune-service/configuration/settings-catalog |
+| Administrative Templates for Windows in Intune | https://learn.microsoft.com/en-us/intune/intune-service/configuration/administrative-templates-windows |
 | Windows shared PC mode settings | https://learn.microsoft.com/en-us/intune/intune-service/configuration/shared-user-device-settings-windows |
 | Shared device mode enrollment for iOS/iPadOS | https://learn.microsoft.com/en-us/intune/intune-service/enrollment/device-enrollment-program-enroll-ios |
 | Intune for Education overview | https://learn.microsoft.com/en-us/intune-education/what-is-intune-for-education |
