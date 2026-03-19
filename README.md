@@ -64,6 +64,21 @@ Validate licensing before solution design. The most common design errors at ente
 | Shared device pools | Device licensing or correct user licensing model | Match licensing to the ownership and sign-in model. |
 | Education-specific administration | Intune for Education plus supporting education licensing | Use education workflows where schools need simplified administration. |
 
+### License Dependency Matrix
+
+Use this table to prevent control designs that exceed current entitlements.
+
+| Capability Area | Minimum Common Dependency | Typical Enterprise Dependency Pattern | Notes |
+| --- | --- | --- | --- |
+| Baseline Conditional Access and app protection controls | Microsoft Entra ID P1 + Intune Plan 1 | E3/E5 with Entra P1 and Intune Plan 1 | Confirm exclusions, report-only rollout, and emergency account design. |
+| Risk-based access with device risk signals | Defender for Endpoint + Microsoft Entra ID P2 | E5 Security / M365 E5 style bundles | Do not enforce device-risk-based CA until onboarding coverage is stable. |
+| Advanced endpoint protection operations (ASR maturity, incident integration depth) | Defender for Endpoint Plan 2 (common pattern) | Security-focused E5-aligned stack | Validate SOC operating model before enabling strict enforcement. |
+| Endpoint privilege management | Intune Suite add-on | Intune Plan 1 + Intune Suite | Fit to least-privilege and local admin reduction strategy. |
+| Remote support with role-based controls | Intune Suite Remote Help add-on | Intune Plan 1 + Intune Suite | Use only where support workflow and audit requirements justify it. |
+| Cloud PKI and certificate lifecycle simplification | Intune Suite Cloud PKI add-on | Intune Plan 1 + Intune Suite | Validate cloud and regulatory constraints, especially in sovereign environments. |
+
+Licensing should be reviewed as part of every security design decision, not only during procurement. Keep a live dependency register for Conditional Access, Defender integration, Intune Suite features, and any role-based support tooling.
+
 Use Intune Suite when there is a measurable problem to solve, such as privilege elevation, remote support, certificate lifecycle simplification, or third-party application standardization. Intune add-ons are currently not supported in sovereign clouds, so confirm cloud constraints before including them in target-state architecture.
 
 ## Tenant Hygiene and Governance
@@ -217,6 +232,91 @@ Recommended practices:
 
 Avoid deploying overlapping baselines and profiles without conflict review.
 
+### Endpoint Security Operating Model
+
+Endpoint security needs a deploy-operate-measure model, not just profile assignment.
+
+#### 1) Ownership and policy layering
+
+- Define one owner for each control family: antivirus, ASR, firewall, disk encryption, account protection, and local admin governance.
+- Separate baseline policy from exception policy. Every exception should include owner, reason, expiry, and review date.
+- Avoid conflicts by assigning each setting family to one authoritative policy type where practical, then document intentional overlaps.
+
+#### 2) Defender for Endpoint onboarding scope
+
+- Roll out onboarding in rings with explicit exit criteria:
+	- Ring 0: security engineering and endpoint engineering pilot devices.
+	- Ring 1: standard corporate managed endpoints.
+	- Ring 2: shared, frontline, and fixed-function populations with explicit exception handling.
+- Treat sensor health and onboarding coverage as prerequisites before using risk-based access enforcement broadly.
+- Keep rollback controls documented so containment actions can be scoped by ring when false-positive activity spikes.
+
+#### 2a) Antivirus and Defender policy ownership
+
+- Use one authoritative policy model for Microsoft Defender Antivirus settings to avoid hidden conflicts.
+- Separate baseline policy from exception policy and keep exception scope minimal.
+- Document owners for real-time protection, cloud-delivered protection, sample submission, scan schedule, exclusions, and remediation defaults.
+- Keep exclusions time-bounded, jointly approved by application and security owners, and tracked as exception debt.
+
+#### 3) Attack Surface Reduction rollout
+
+- Start new ASR rules in audit mode for pilot populations.
+- Promote rules to block mode in waves after compatibility review and app-owner validation.
+- Maintain a rule register with mode, owner, exception list, and retirement date for exceptions.
+- Do not disable an entire ASR profile for one incompatible app; isolate to a targeted exception pattern.
+
+| ASR Ring | Goal | Typical Duration | Exit Criteria |
+| --- | --- | --- | --- |
+| Lab | Validate behavior in controlled devices | 1-2 weeks | No critical app or admin workflow breakage |
+| Pilot | Validate with IT, security, and engineering cohorts | 2-4 weeks | Acceptable audit findings and documented mitigations |
+| Broad | Enforce on standard corporate populations in waves | 4-8 weeks by wave | Help-desk and block telemetry remain within threshold |
+| Holdback | Temporary exception population only | Time-bounded | Exception retired or alternate control documented |
+
+ASR rollout operations:
+
+- Review ASR telemetry weekly during rollout waves.
+- Promote to broad enforcement only after rollback steps are tested.
+- Keep a per-rule audit-to-block change log with owner and approval record.
+
+#### 4) Firewall baseline strategy
+
+- Keep Windows Defender Firewall enabled for domain, private, and public profiles unless an exception is approved.
+- Use baseline inbound deny posture with explicit allow rules tied to business-owned requirements.
+- Maintain a time-bounded emergency exception workflow and review temporary rules on a fixed cadence.
+
+#### 5) Disk encryption and recovery operations
+
+- Enforce BitLocker with recovery key escrow validation before broad rollout.
+- Define help-desk and security runbooks for identity verification, key retrieval approval, logging, and post-recovery review.
+- Track escrow coverage as an operational metric and treat non-escrowed encrypted devices as policy exceptions.
+
+#### 6) Tamper protection and Windows LAPS governance
+
+- Enable tamper protection by default for supported managed endpoints and use a documented, time-bounded process for rare support exceptions.
+- Use Windows LAPS with explicit RBAC, retrieval auditing, and break-glass approvals.
+- Require post-use review for local admin password retrieval in privileged or incident contexts.
+
+#### 7) Incident response and SIEM integration
+
+- Define escalation flow across endpoint engineering, SOC, and identity teams.
+- Correlate Intune compliance state, Defender incident context, and sign-in/access signals in Sentinel or another SIEM.
+- Preserve device evidence before destructive lifecycle actions when a security incident is active.
+
+| Security Scenario | Intune Action | Defender/SOC Action | Identity/Access Action |
+| --- | --- | --- | --- |
+| Suspected malware on standard endpoint | Collect device context and isolate if policy allows | Validate incident severity and containment path | Evaluate sign-in risk and apply step-up controls |
+| Confirmed compromise on privileged workstation | Pause lifecycle deletion and capture investigation artifacts | Escalate to high-severity response workflow | Revoke sessions, force stronger auth, evaluate account impact |
+| Repeated policy tamper indicators | Validate policy assignments and device state | Investigate tamper events and persistence behaviors | Restrict risky access paths during investigation |
+
+Incident RACI baseline:
+
+| Function | Primary Responsibility |
+| --- | --- |
+| Endpoint engineering (EUC) | Policy deployment, device containment execution, lifecycle control gates |
+| SOC | Detection triage, incident coordination, escalation decisions |
+| Identity team | Conditional Access response, account/session risk actions |
+| Help desk | Approved recovery workflows and ticket-linked operational support |
+
 ## Compliance and Conditional Access Alignment
 
 Compliance policy is the device posture signal. Conditional Access is the enforcement layer. They must be designed together.
@@ -234,6 +334,19 @@ Access design guidance:
 - Corporate managed devices: require compliant device where the app and user workflow justify it.
 - BYOD productivity access: prefer app-based Conditional Access and app protection policy where full enrollment is unnecessary.
 - Administrative access: use stricter controls than standard user access.
+
+### Device Risk and Access Decision Patterns
+
+Use explicit decision patterns so report-only and enforcement phases remain predictable.
+
+| Scenario | Recommended Conditional Access Pattern | Operational Notes |
+| --- | --- | --- |
+| Managed corporate access to high-value apps | Require compliant device, then add risk-based controls where licensing and onboarding support it | Roll out in report-only mode first and validate blast radius. |
+| BYOD productivity access | Require approved client app and app protection policy instead of full MDM where possible | Reduces friction while preserving data controls. |
+| Privileged admin access | Require stronger controls than standard users (device trust, strong auth, narrow exclusions) | Keep admin access policy separated from user policy. |
+| Shared or non-persistent device workflows | Use persona-specific exceptions with compensating controls and short review cadence | Do not copy standard named-user policy without validation. |
+
+Risk-driven access enforcement should not be treated as day-1 default. Enable only after onboarding coverage, sensor health, and exception governance are mature.
 
 ## Shared, Frontline, and Education Design Branches
 
@@ -272,6 +385,15 @@ Operational specifics to preserve:
 - Cleanup rules do not wipe or retire devices.
 - Hidden devices can reappear if they check in again before certificate expiry.
 
+### Recovery, Forensics, and Incident Preservation
+
+Lifecycle actions should account for active security investigations.
+
+- Define a hold process that pauses wipe, delete, and reprovisioning for devices under active incident investigation.
+- Preserve required evidence before destructive actions, including timeline, device state, and ticket linkage.
+- Separate rapid containment workflows from final remediation workflows so forensic value is not lost.
+- Document when to choose isolate, retire, wipe, or reprovision based on incident severity and recovery objectives.
+
 ## Reporting and Monitoring
 
 Use reporting to operate the environment, not just to present status.
@@ -292,6 +414,32 @@ Recommended tooling:
 - Windows feature update readiness and organizational update reporting
 - Endpoint analytics for performance and experience trends
 - Log Analytics or other enterprise reporting platforms for cross-domain views
+
+### Security KPIs and SLOs
+
+Add measurable targets so endpoint security operations can enforce gates, not just report trends.
+
+| Metric | Example Target | Review Cadence | Trigger Action |
+| --- | --- | --- | --- |
+| Defender onboarding coverage (target populations) | >= 98% | Weekly | Pause new risk-based CA rollout if below target for two periods. |
+| Sensor health coverage | >= 97% of onboarded in-scope endpoints reporting healthy telemetry | Weekly | Investigate onboarding drift and connector health. |
+| ASR production-rule health | No critical exception older than 30 days | Weekly | Escalate exception owner and require remediation plan. |
+| BitLocker escrow coverage on encrypted corporate devices | >= 99% | Weekly | Block broader enforcement waves until escrow gap is closed. |
+| Firewall baseline compliance | >= 98% on managed corporate endpoints | Weekly | Review conflicting policies and exception sprawl. |
+| LAPS rotation and retrieval audit health | >= 99% successful rotation; 100% audited retrieval events | Monthly | Investigate role misuse and adjust RBAC scope tags. |
+| Mean time to triage (high severity) | <= 30 minutes | Weekly | Trigger SOC and endpoint staffing review. |
+| High-severity endpoint incident MTTR | <= 4 business hours baseline | Weekly | Trigger joint endpoint/SOC RCA and containment playbook review. |
+| Exception debt | 0 critical exceptions past review date | Weekly | Freeze expansion in affected ring until debt is reduced. |
+
+SLOs should be ring-aware. Pilot rings can tolerate exploratory variance; broad rings should enforce stricter thresholds and freeze expansion when thresholds are repeatedly missed.
+
+Example security SLOs:
+
+- Critical onboarding failures are triaged within 1 business day.
+- High-severity incidents are owned within 30 minutes and containment begins within 2 hours.
+- Recovery key access events are reviewed within 1 business day.
+- ASR exceptions are reviewed monthly and expire unless renewed.
+- Sustained firewall or BitLocker drift above threshold triggers service review.
 
 ## Practical Implementation Checklists
 
@@ -348,25 +496,35 @@ Official Microsoft Learn references used to align this guide:
 | Topic | Microsoft Learn |
 | --- | --- |
 | Intune overview and planning | https://learn.microsoft.com/en-us/intune/ |
-| Intune licensing | https://learn.microsoft.com/en-us/intune/intune-service/fundamentals/licenses |
+| Intune licensing | https://learn.microsoft.com/en-us/intune/fundamentals/licensing/ |
 | Assign Intune licenses | https://learn.microsoft.com/en-us/intune/fundamentals/licensing/assign-licenses |
 | Intune add-ons and sovereign cloud limitation | https://learn.microsoft.com/en-us/intune/intune-service/fundamentals/intune-add-ons |
 | Windows automatic enrollment and MDM user scope | https://learn.microsoft.com/en-us/intune/intune-service/enrollment/windows-enroll |
-| Assignment filters | https://learn.microsoft.com/en-us/mem/intune/fundamentals/filters |
+| Assignment filters | https://learn.microsoft.com/en-us/intune/intune-service/fundamentals/filters |
 | RBAC and scope tags | https://learn.microsoft.com/en-us/intune/intune-service/fundamentals/scope-tags |
 | Co-management overview | https://learn.microsoft.com/en-us/intune/configmgr/comanage/overview |
-| Win32 app management, IME behavior, 30 GB limit, and Autopilot caution | https://learn.microsoft.com/en-us/mem/intune/apps/apps-win32-app-management |
+| Win32 app management, IME behavior, 30 GB limit, and Autopilot caution | https://learn.microsoft.com/en-us/intune/intune-service/apps/apps-win32-app-management |
 | Windows Autopilot device preparation FAQ | https://learn.microsoft.com/en-us/autopilot/device-preparation/faq |
 | Windows feature update policy guidance | https://learn.microsoft.com/en-us/intune/device-updates/windows/feature-update-policy |
-| Device cleanup rules | https://learn.microsoft.com/en-us/intune/intune-service/fundamentals/device-cleanup-rules |
-| Intune security baselines | https://learn.microsoft.com/en-us/mem/intune/protect/security-baselines |
-| Device compliance policy guidance | https://learn.microsoft.com/en-us/mem/intune/protect/device-compliance-get-started |
-| Require device compliance with Conditional Access | https://learn.microsoft.com/en-us/mem/intune/protect/create-conditional-access-intune |
-| App protection policy overview | https://learn.microsoft.com/en-us/mem/intune/apps/app-protection-policy |
+| Device cleanup rules | https://learn.microsoft.com/en-us/intune/governance/device-cleanup-rules |
+| Intune security baselines | https://learn.microsoft.com/en-us/intune/intune-service/protect/security-baselines |
+| Endpoint security policy framework in Intune | https://learn.microsoft.com/en-us/intune/intune-service/protect/endpoint-security-policy |
+| Manage attack surface reduction policy in Intune | https://learn.microsoft.com/en-us/intune/intune-service/protect/endpoint-security-asr-policy |
+| Manage firewall policy in Intune endpoint security | https://learn.microsoft.com/en-us/intune/intune-service/protect/endpoint-security-firewall-policy |
+| Manage disk encryption policy in Intune endpoint security | https://learn.microsoft.com/en-us/intune/intune-service/protect/endpoint-security-disk-encryption-policy |
+| Account protection and Windows LAPS policy in Intune | https://learn.microsoft.com/en-us/intune/intune-service/protect/endpoint-security-account-protection-policy |
+| Device compliance policy guidance | https://learn.microsoft.com/en-us/intune/intune-service/protect/device-compliance-get-started |
+| Require device compliance with Conditional Access | https://learn.microsoft.com/en-us/entra/identity/conditional-access/policy-all-users-device-compliance |
+| Use Defender for Endpoint with Intune | https://learn.microsoft.com/en-us/intune/intune-service/protect/mde-security-integration |
+| Microsoft Defender tamper protection overview | https://learn.microsoft.com/en-us/defender-endpoint/prevent-changes-to-security-settings-with-tamper-protection |
+| App protection policy overview | https://learn.microsoft.com/en-us/intune/intune-service/apps/app-protection-policy |
 | App-based Conditional Access | https://learn.microsoft.com/en-us/intune/intune-service/protect/app-based-conditional-access-intune-create |
 | Windows shared PC mode settings | https://learn.microsoft.com/en-us/intune/intune-service/configuration/shared-user-device-settings-windows |
 | Shared device mode enrollment for iOS/iPadOS | https://learn.microsoft.com/en-us/intune/intune-service/enrollment/device-enrollment-program-enroll-ios |
 | Intune for Education overview | https://learn.microsoft.com/en-us/intune-education/what-is-intune-for-education |
 | School enrollment guidance | https://learn.microsoft.com/en-us/intune-education/how-should-i-enroll-devices |
-| Endpoint analytics | https://learn.microsoft.com/en-us/intune/analytics/overview |
+| Endpoint analytics | https://learn.microsoft.com/en-us/intune/endpoint-analytics/ |
+| Microsoft Sentinel Intune data connector | https://learn.microsoft.com/en-us/azure/sentinel/data-connectors-reference#microsoft-intune |
+| Microsoft Sentinel Defender XDR connector | https://learn.microsoft.com/en-us/azure/sentinel/data-connectors-reference#microsoft-defender-xdr |
+| Microsoft Defender XDR incident response overview | https://learn.microsoft.com/en-us/defender-xdr/investigate-incidents |
 | Windows 10 end of support and migration context | https://learn.microsoft.com/en-us/lifecycle/announcements/windows-10-end-of-support |
