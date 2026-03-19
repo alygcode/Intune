@@ -4,6 +4,8 @@ This document is designed as a dual-purpose asset:
 1. Deep-dive training curriculum for a 20-22 hour course.
 2. Day-to-day reference manual for IT administrators and security professionals.
 
+Last validated against Microsoft Learn documentation: 2026-03-19.
+
 Recommended pacing (20-22 hours):
 - Module 1-3 foundations: 4 hours
 - Module 4-6 deployment and controls: 8 hours
@@ -20,6 +22,7 @@ Why:
 - Prevents ad-hoc deployment, reduces operational drift, and aligns Intune with Zero Trust and measurable security outcomes.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Use a 5-phase cycle for each domain: Discover, Baseline, Prioritize, Implement, Validate.
 - Define measurable KPIs per phase (for example: enrollment success rate, compliance rate, patch latency, startup score, risk-based sign-in blocks).
 - Run optimization as a recurring quarterly program, not a one-time project.
@@ -37,6 +40,7 @@ Why:
 - Features like Endpoint Privilege Management, advanced analytics, and risk-based Conditional Access depend on specific SKUs.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Standardize baseline on Intune Plan 1 + Entra ID P1 + Defender for Endpoint Plan 2 for security-focused enterprises.
 - Use Intune Suite add-ons only where required by use case and maturity.
 - Map each control to its license dependency before design approval.
@@ -44,6 +48,8 @@ Best Practice Recommendation:
 Gotchas/Notes:
 - Some capabilities in Identity Protection, Endpoint Analytics advanced views, and EPM require premium licensing.
 - Mixed academic and commercial licensing can create feature inconsistency across user populations.
+- Intune admins typically require an Intune license assignment unless unlicensed admin access is explicitly configured.
+- Co-management auto-enrollment has specific licensing behavior (Intune co-management rights and Entra P1/P2 dependencies); validate this before rollout.
 
 ## 1.3 Intune Add-ons
 
@@ -54,6 +60,7 @@ Why:
 - Add-ons close operational and security gaps not covered by core MDM/MAM.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Remote Help: enable role-based support with audit trails and secure elevation workflows.
 - EPM: use just-in-time elevation with explicit allowlists; remove local admin rights broadly.
 - Cloud PKI: use for certificate lifecycle simplification and cloud-native trust issuance.
@@ -63,6 +70,7 @@ Best Practice Recommendation:
 Gotchas/Notes:
 - EPM policy sprawl can become unmanageable without strict app publisher/path/hash governance.
 - Tunnel design must account for latency, app dependency maps, and split tunnel requirements.
+- Intune add-ons are not supported in Sovereign clouds; confirm cloud environment support before design commitment.
 
 ## 2.1 Azure AD (Entra ID) Integration
 
@@ -73,6 +81,7 @@ Why:
 - Identity is the policy decision point for Zero Trust and Conditional Access.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Prefer PHS over PTA for resilience, cloud availability, and simpler operations.
 - Prefer Entra Join over Hybrid Join for new devices unless a strict legacy dependency exists.
 - Minimize federation complexity; use managed authentication where possible.
@@ -90,9 +99,11 @@ Why:
 - MFA is one of the highest-impact controls against account compromise.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Enforce MFA using Conditional Access, not per-user MFA.
 - Maintain at least two emergency access accounts excluded from most controls, protected by strong passwords and offline monitoring.
 - Block legacy authentication protocols tenant-wide.
+- Deploy new MFA and block-legacy policies in report-only mode first, then move to enforced mode after impact review.
 
 Gotchas/Notes:
 - Break-glass accounts must be tested regularly and excluded only from necessary policies.
@@ -107,9 +118,10 @@ Why:
 - Group design drives policy targeting, least privilege, and operational safety.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Use dynamic device/user groups for lifecycle-based targeting.
 - Enforce strict admin separation by role (identity, endpoint, security, helpdesk).
-- Keep Global Admin count minimal (ideally 2-5 permanent, with PIM for just-in-time elevation).
+- Keep permanent Global Administrator assignments to the minimum operationally required, and use PIM for just-in-time elevation for all other privileged activity.
 - Disable default user ability to create tenants/apps where not needed.
 
 Gotchas/Notes:
@@ -125,11 +137,13 @@ Why:
 - Core Zero Trust enforcement layer for verify explicitly and assume breach principles.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Implement in phased mode: report-only, pilot, production.
 - Enforce admin MFA and compliant-device requirements for privileged access.
 - Block legacy auth globally.
 - Require compliant or hybrid/Entra joined devices for sensitive apps.
-- Set sign-in frequency intentionally (for example 8-12 hours for normal users, tighter for admins).
+- For risk policies, use Microsoft-recommended defaults: separate user-risk and sign-in-risk policies, require MFA for medium/high sign-in risk, and require sign-in frequency set to Every time.
+- For non-risk-based session controls, define sign-in frequency by app sensitivity and business tolerance for reauthentication prompts.
 - Include named locations and risk-based controls via Identity Protection.
 
 Gotchas/Notes:
@@ -145,6 +159,7 @@ Why:
 - Reduces standing privilege, limits access creep, and improves audit posture.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Use PIM for all privileged roles with approval and justification.
 - Schedule recurring Access Reviews for privileged groups and high-value apps.
 - Restrict user consent for risky app permissions; use admin consent workflow.
@@ -163,6 +178,7 @@ Why:
 - Supports least privilege and regional/business-unit separation.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Create role profiles by function (L1 support, L2 endpoint, policy engineer, security ops).
 - Apply scope tags consistently to devices, policies, and apps.
 
@@ -178,6 +194,7 @@ Why:
 - Improves enrollment completion and reduces helpdesk tickets.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Standardize naming, support contacts, and policy messaging across all portals.
 - Localize key guidance for major user regions.
 
@@ -193,7 +210,8 @@ Why:
 - Prevents ghost devices, improves reporting accuracy, and reduces policy targeting errors.
 
 Best Practice Recommendation:
-- Define cleanup threshold by platform behavior (for example: 60-90 days inactive).
+- Classification: `[ORG-DEFINED]` Organization-defined choice
+- Define cleanup thresholds by platform behavior and business lifecycle requirements; no single Microsoft default inactivity period applies to all tenants.
 - Align cleanup with HR offboarding and asset disposal processes.
 
 Gotchas/Notes:
@@ -208,6 +226,7 @@ Why:
 - Prevents policy duplication and enables precise assignments.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Use filters for platform/version/manufacturer logic instead of cloning policies.
 - Use categories sparingly and only for meaningful operational segmentation.
 
@@ -223,6 +242,7 @@ Why:
 - Enables staged migration from legacy endpoint management to cloud-first controls.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Move workloads in sequence: compliance, resource access, endpoint protection, apps, updates.
 - Set clear co-management boundaries and exit criteria for each workload.
 
@@ -238,6 +258,7 @@ Why:
 - Reduces non-compliance dwell time and improves user self-service.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Use clear call-to-action language with deadlines and support links.
 - Coordinate messaging with compliance grace periods.
 
@@ -253,6 +274,7 @@ Why:
 - Faster root-cause identification reduces outage impact and helpdesk cost.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Standardize a troubleshooting runbook: identity check, assignment check, MDM authority, policy conflict, agent health.
 - Capture reproducible evidence (device timeline, logs, affected scope, recent changes).
 
@@ -268,12 +290,15 @@ Why:
 - Controls attack surface and ensures only supported device types enter management.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Block unsupported OS versions by default.
 - Set enrollment limits to prevent abuse and stale multi-device accumulation.
 - Separate corporate-owned from BYOD with dedicated profiles and app protection policies.
 
 Gotchas/Notes:
 - Misaligned restrictions can block legitimate provisioning waves.
+- Enrollment restrictions are not a primary security boundary; treat them as guardrails and pair with compliance and Conditional Access.
+- For many non-user-driven enrollments (for example Autopilot self-deploying or pre-provisioned flows), default restriction behavior applies.
 
 ## 4.2 Ownership Models: Corporate vs BYOD
 
@@ -284,8 +309,10 @@ Why:
 - Corporate devices can support full security hardening; BYOD often requires privacy-preserving MAM.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Corporate: full MDM + compliance + security baseline + update governance.
 - BYOD: app protection policy first, minimal device controls, clear privacy disclosure.
+- For Apple devices, use ADE or corporate identifiers where possible to ensure accurate corporate ownership classification.
 
 Gotchas/Notes:
 - Incorrect ownership tagging can apply invasive controls to personal devices.
@@ -299,6 +326,7 @@ Why:
 - Reduces imaging overhead, accelerates secure provisioning, and supports remote-first operations.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Use user-driven Autopilot for knowledge workers; pre-provision for high-volume or poor-network scenarios.
 - Enforce Entra Join + automatic MDM enrollment for greenfield deployments.
 - Integrate Windows 365 devices into the same compliance and Conditional Access framework.
@@ -316,6 +344,7 @@ Why:
 - ADE ensures supervised management and stronger enterprise control on corporate Macs.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Use ABM federated identity and ADE for all corporate macOS devices.
 - Require supervised enrollment for strong security posture.
 - Deploy SSO extension to improve modern auth sign-in experience.
@@ -333,6 +362,7 @@ Why:
 - Extends Conditional Access and compliance to developer and engineering endpoints.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Use Linux enrollment primarily for device compliance and access gating.
 - Pair with Defender for Endpoint where supported for security signal enrichment.
 
@@ -348,6 +378,7 @@ Why:
 - Supports mixed endpoint estates and access governance consistency.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Use platform-native management where required, and integrate identity/compliance signals with Entra Conditional Access.
 
 Gotchas/Notes:
@@ -362,6 +393,7 @@ Why:
 - Compliance state is a key gate in Conditional Access.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Build tiered compliance baselines: strict for privileged users, standard for workforce, exception profile for approved edge cases.
 - Tie every compliance rule to a risk statement and owner.
 
@@ -377,6 +409,7 @@ Why:
 - Stale status can allow risky access or trigger false blocks.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Tune validity windows by risk: shorter for admins/high-risk apps, balanced for regular users.
 
 Gotchas/Notes:
@@ -391,6 +424,7 @@ Why:
 - Fast user action reduces access disruptions and support load.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Trigger notifications at first detection and before enforcement milestones.
 - Include self-help steps and escalation path.
 
@@ -406,6 +440,7 @@ Why:
 - Combines configuration state with threat posture for stronger access control.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Enable Defender for Endpoint compliance integration.
 - Require BitLocker and healthy Defender anti-malware state.
 - Use device risk level thresholds aligned to business sensitivity.
@@ -422,6 +457,7 @@ Why:
 - Ensures baseline hygiene for enterprise Apple endpoints.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Enforce minimum supported macOS versions and FileVault encryption.
 - Use staged deadlines for major OS transitions.
 
@@ -437,6 +473,7 @@ Why:
 - Enables Conditional Access decisions for Linux endpoints.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Use Linux compliance for access gating, then augment hardening with platform-native tools.
 
 Gotchas/Notes:
@@ -451,6 +488,7 @@ Why:
 - Converts policy drift into enforceable remediation timeline.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Apply progressive enforcement: immediate user notification, short grace period, then access block.
 - Reserve retire/wipe for corporate-owned severe cases.
 
@@ -466,6 +504,7 @@ Why:
 - Replaces many classic GPO scenarios in cloud-managed environments.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Prefer Settings Catalog for new policy design.
 - Group policies by domain (security, experience, network, privacy) with clear naming standards.
 
@@ -481,12 +520,16 @@ Why:
 - Enables phased migration from on-prem GPO to cloud policy management.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Inventory current GPOs and classify as retire, replace, or migrate.
 - Use ADMX ingestion only where Settings Catalog is unavailable.
 - Maintain a policy source-of-truth map to avoid dual control.
+- Use Group Policy Analytics to migrate settings into Settings Catalog, then rationalize conflicts before broad deployment.
 
 Gotchas/Notes:
 - GPO and Intune conflicts are common in hybrid estates; document authority by setting.
+- Firewall and AppLocker settings are often better managed through Intune Endpoint Security workloads than direct migration.
+- GPO migration is best effort; some settings map to alternate CSP-backed settings instead of one-to-one parity.
 
 ## 6.3 Windows Configuration: BitLocker
 
@@ -497,6 +540,7 @@ Why:
 - Protects data at rest and supports regulatory requirements.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Enable BitLocker silently for supported hardware.
 - Escrow recovery keys to Entra and validate retrieval process.
 - Require TPM-based protection and block weaker configurations.
@@ -513,6 +557,7 @@ Why:
 - Accelerates secure configuration with tested defaults.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Deploy Security Baseline and Defender Baseline to pilot groups first.
 - Compare baseline settings against existing controls and tune exceptions deliberately.
 - Re-baseline after major Windows releases.
@@ -529,6 +574,7 @@ Why:
 - Handles edge cases and custom enterprise requirements.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Keep scripts idempotent, signed where possible, and version controlled.
 - Use scripts to bridge temporary gaps, then replace with native policy controls.
 
@@ -544,6 +590,7 @@ Why:
 - Shifts operations from reactive break-fix to proactive correction.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Target high-frequency issues first (stuck services, misconfigurations, cert drift).
 - Track remediation success rate and mean time to recover.
 
@@ -559,6 +606,7 @@ Why:
 - Provides enterprise control while accommodating Apple platform differences.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Use Settings Catalog for standard controls, FileVault enforcement for encryption, and minimal shell scripts for gaps.
 - Validate major changes against multiple macOS versions.
 
@@ -574,6 +622,7 @@ Why:
 - Supports consistent governance for mixed-platform organizations.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Use Intune for identity/compliance anchoring, and combine with configuration management tools for deeper hardening.
 
 Gotchas/Notes:
@@ -588,6 +637,7 @@ Why:
 - Simplifies app lifecycle and standardizes productivity stack.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Prefer new Store app type for supported apps.
 - Use Microsoft 365 Apps deployment with update channel governance aligned to release rings.
 
@@ -603,6 +653,7 @@ Why:
 - Required for enterprise apps not available in Store.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Enforce packaging standards: detection rules, return codes, supersedence, dependencies.
 - Use requirement rules to avoid unsupported target installs.
 
@@ -618,6 +669,7 @@ Why:
 - Ensures consistent application baseline for Apple endpoints.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Prefer signed PKG installers with tested uninstall behavior.
 - Manage Office update channel intentionally for pilot and broad cohorts.
 
@@ -633,6 +685,7 @@ Why:
 - Improves user portal discoverability and deployment governance.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Classify apps by business function and criticality.
 - Separate required, available, and uninstall intents clearly.
 
@@ -648,8 +701,9 @@ Why:
 - Timely patching lowers exploit exposure and supports compliance obligations.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Move from WSUS dependency to cloud-native Windows Update for Business rings.
-- Create at least 3 rings: Pilot, Broad, Critical.
+- Use staged deployment rings (for example test, pilot, broad production), with ring count and pacing defined by organizational risk tolerance and app compatibility requirements.
 - Use expedited quality updates for zero-day response.
 - Evaluate driver updates separately with staged rollout.
 - Use Windows Autopatch where operational model supports managed cadence.
@@ -658,6 +712,8 @@ Best Practice Recommendation:
 Gotchas/Notes:
 - Ring assignment errors can produce simultaneous broad deployment and high blast radius.
 - Feature update pinning requires explicit lifecycle tracking.
+- Windows LTSC devices support quality updates but have feature-update control limitations; segment LTSC targeting explicitly.
+- Ensure required update prerequisites and services are healthy on clients (for example endpoint reachability and update client dependencies).
 
 ## 9.1 Reporting: Native Intune Reports
 
@@ -668,6 +724,7 @@ Why:
 - Provides baseline visibility for daily endpoint operations.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Define report review cadence by audience: daily ops, weekly engineering, monthly governance.
 
 Gotchas/Notes:
@@ -682,6 +739,7 @@ Why:
 - Enables multi-source insights and executive-ready dashboards.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Build role-specific workbook views (SOC, endpoint ops, leadership).
 - Standardize key KPIs: compliance trend, remediation time, update latency, high-risk sign-ins.
 
@@ -697,11 +755,13 @@ Why:
 - Poor startup experience drives productivity loss and support volume.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Set threshold-based investigations for low-performing cohorts.
 - Correlate startup regressions with app/policy changes.
 
 Gotchas/Notes:
 - Hardware variance can skew interpretation if cohorts are not normalized.
+- Endpoint Analytics depends on required diagnostic data flow and telemetry service health; verify data prerequisites early.
 
 ## 9.4 Endpoint Analytics: Reliability and User Experience
 
@@ -712,6 +772,7 @@ Why:
 - Identifies chronic instability before it becomes an incident.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Use reliability score trends to prioritize engineering backlog.
 - Tie repeated reliability drops to proactive remediation campaigns.
 
@@ -727,6 +788,7 @@ Why:
 - Early detection of failed rollouts reduces business impact.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Establish SLOs for deployment success and remediation windows.
 - Alert on exception thresholds, not only absolute failures.
 
@@ -742,6 +804,7 @@ Why:
 - Supports enterprise-level insights beyond portal-native reporting.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Build semantic models around device lifecycle, compliance drift, app health, and update velocity.
 - Use row-level security in Power BI for delegated visibility.
 
@@ -757,6 +820,7 @@ Why:
 - Improves confidence in patch quality and rollout progression.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Track safeguard holds, error codes, and rollback signals before moving rings forward.
 
 Gotchas/Notes:
@@ -771,6 +835,7 @@ Why:
 - Foundation for proactive operations and cross-domain incident investigation.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Route critical endpoint, identity, and security tables to a governed workspace with retention policy.
 - Use actionable alert rules tied to incident playbooks.
 
@@ -786,6 +851,7 @@ Why:
 - Enables custom detection of anomalies and operational failures.
 
 Best Practice Recommendation:
+- Classification: `[ORG-DEFINED]` Organization-defined choice
 - Standardize reusable KQL functions for common analyses: deployment failure outliers, compliance drift, risky sign-in correlation.
 - Version control critical KQL queries.
 
@@ -801,11 +867,14 @@ Why:
 - Adds adaptive controls based on threat intelligence and behavior anomalies.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Require password change and stronger auth for medium/high user risk.
 - Block high sign-in risk for privileged accounts by default.
+- Keep user-risk and sign-in-risk controls in separate Conditional Access policies for clearer operations and safer tuning.
 
 Gotchas/Notes:
 - Risk policy tuning must balance false positives and security sensitivity.
+- For risk-based policies, report-only deployment and emergency access exclusions are mandatory operational safeguards.
 
 ## 11.2 Integration: Defender for Cloud Apps (Session Controls)
 
@@ -816,6 +885,7 @@ Why:
 - Provides real-time control over risky sessions, downloads, and data exfiltration.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Apply session controls to unmanaged or high-risk sessions for sensitive apps.
 - Start with monitor mode, then enforce block/protect actions based on observed behavior.
 
@@ -831,6 +901,7 @@ Why:
 - Bridges hybrid identity attack paths that cloud-only monitoring can miss.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Integrate Defender for Identity alerts into SOC workflow and correlate with Entra risk events.
 
 Gotchas/Notes:
@@ -845,6 +916,7 @@ Why:
 - Enables risk-based compliance, stronger response automation, and prioritized remediation.
 
 Best Practice Recommendation:
+- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
 - Onboard all supported endpoints to MDE and enforce tamper protection.
 - Use TVM exposure scores to prioritize patching and remediation policies.
 - Integrate device risk with Conditional Access and compliance for closed-loop enforcement.
@@ -873,9 +945,115 @@ Gotchas/Notes:
 2. Track exceptions with expiration dates and compensating controls.
 
 - Metrics:
-1. Enrollment success rate above 98 percent for corporate devices.
-2. Compliance above 95 percent for active fleet.
+1. Set organization-defined enrollment success and compliance targets aligned to business risk, device diversity, and support capacity.
 3. Critical patch deployment within defined SLA by ring.
 4. Mean time to remediate repeated endpoint issues trending downward quarter over quarter.
 
 This guidance reflects an enterprise standard posture emphasizing Zero Trust identity, cloud-native endpoint governance, reduced legacy dependency, and proactive security operations.
+
+## Microsoft Learn Reference Set (Validated)
+
+Identity and Conditional Access:
+- https://learn.microsoft.com/entra/identity/hybrid/connect/choose-ad-authn
+- https://learn.microsoft.com/entra/identity/conditional-access/plan-conditional-access
+- https://learn.microsoft.com/entra/identity/conditional-access/policy-block-legacy-authentication
+- https://learn.microsoft.com/entra/id-protection/howto-identity-protection-configure-risk-policies
+
+Licensing and Add-ons:
+- https://learn.microsoft.com/intune/fundamentals/licensing/
+- https://learn.microsoft.com/intune/intune-service/fundamentals/intune-add-ons
+
+Enrollment and Ownership:
+- https://learn.microsoft.com/intune/intune-service/enrollment/enrollment-restrictions-set
+- https://learn.microsoft.com/intune/intune-service/fundamentals/deployment-guide-enrollment-windows
+
+Configuration and GPO Transition:
+- https://learn.microsoft.com/intune/intune-service/configuration/group-policy-analytics-migrate
+- https://learn.microsoft.com/intune/intune-service/configuration/administrative-templates-windows
+
+Updates:
+- https://learn.microsoft.com/intune/device-updates/windows/update-rings
+- https://learn.microsoft.com/intune/device-updates/windows/feature-updates
+- https://learn.microsoft.com/intune/device-updates/windows/quality-updates
+
+Monitoring and Security Integration:
+- https://learn.microsoft.com/intune/endpoint-analytics/
+- https://learn.microsoft.com/intune/intune-service/protect/microsoft-defender-with-intune
+- https://learn.microsoft.com/defender-endpoint/conditional-access
+
+## Recommendation Classification Legend
+
+- `[MS-EXPLICIT]` Microsoft explicit default: Documented Microsoft default or directly prescribed setting value/behavior.
+- `[MS-RECOMMENDED]` Microsoft recommended pattern: Microsoft-recommended architecture or deployment approach without a single hardcoded tenant value.
+- `[ORG-DEFINED]` Organization-defined choice: Must be tuned to business risk, legal requirements, platform mix, or operational model.
+
+## Recommendation Classification Index
+
+1.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
+1.2: `[MS-RECOMMENDED]` Microsoft recommended pattern
+1.3: `[MS-RECOMMENDED]` Microsoft recommended pattern
+
+2.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
+2.2: `[MS-RECOMMENDED]` Microsoft recommended pattern
+2.3: `[ORG-DEFINED]` Organization-defined choice
+2.4: `[MS-RECOMMENDED]` Microsoft recommended pattern
+2.5: `[MS-RECOMMENDED]` Microsoft recommended pattern
+
+3.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
+3.2: `[ORG-DEFINED]` Organization-defined choice
+3.3: `[ORG-DEFINED]` Organization-defined choice
+3.4: `[ORG-DEFINED]` Organization-defined choice
+3.5: `[MS-RECOMMENDED]` Microsoft recommended pattern
+3.6: `[ORG-DEFINED]` Organization-defined choice
+3.7: `[MS-RECOMMENDED]` Microsoft recommended pattern
+
+4.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
+4.2: `[MS-RECOMMENDED]` Microsoft recommended pattern
+4.3: `[MS-RECOMMENDED]` Microsoft recommended pattern
+4.4: `[MS-RECOMMENDED]` Microsoft recommended pattern
+4.5: `[MS-RECOMMENDED]` Microsoft recommended pattern
+4.6: `[ORG-DEFINED]` Organization-defined choice
+
+5.1: `[ORG-DEFINED]` Organization-defined choice
+5.2: `[ORG-DEFINED]` Organization-defined choice
+5.3: `[ORG-DEFINED]` Organization-defined choice
+5.4: `[MS-RECOMMENDED]` Microsoft recommended pattern
+5.5: `[MS-RECOMMENDED]` Microsoft recommended pattern
+5.6: `[MS-RECOMMENDED]` Microsoft recommended pattern
+5.7: `[ORG-DEFINED]` Organization-defined choice
+
+6.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
+6.2: `[MS-RECOMMENDED]` Microsoft recommended pattern
+6.3: `[MS-RECOMMENDED]` Microsoft recommended pattern
+6.4: `[MS-RECOMMENDED]` Microsoft recommended pattern
+6.5: `[ORG-DEFINED]` Organization-defined choice
+6.6: `[MS-RECOMMENDED]` Microsoft recommended pattern
+6.7: `[MS-RECOMMENDED]` Microsoft recommended pattern
+6.8: `[ORG-DEFINED]` Organization-defined choice
+
+7.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
+7.2: `[MS-RECOMMENDED]` Microsoft recommended pattern
+7.3: `[MS-RECOMMENDED]` Microsoft recommended pattern
+7.4: `[ORG-DEFINED]` Organization-defined choice
+
+8.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
+
+9.1: `[ORG-DEFINED]` Organization-defined choice
+9.2: `[ORG-DEFINED]` Organization-defined choice
+9.3: `[MS-RECOMMENDED]` Microsoft recommended pattern
+9.4: `[MS-RECOMMENDED]` Microsoft recommended pattern
+9.5: `[ORG-DEFINED]` Organization-defined choice
+
+10.1: `[ORG-DEFINED]` Organization-defined choice
+10.2: `[MS-RECOMMENDED]` Microsoft recommended pattern
+10.3: `[ORG-DEFINED]` Organization-defined choice
+10.4: `[ORG-DEFINED]` Organization-defined choice
+
+11.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
+11.2: `[MS-RECOMMENDED]` Microsoft recommended pattern
+11.3: `[MS-RECOMMENDED]` Microsoft recommended pattern
+11.4: `[MS-RECOMMENDED]` Microsoft recommended pattern
+
+Notes:
+- User-risk and sign-in-risk policies in 11.1 have Microsoft explicit defaults available in current guidance (for example, sign-in risk medium/high with MFA, risk remediation controls, and report-only to enforced rollout path).
+- Most enrollment thresholds, cleanup windows, ring pacing, and KPI targets are intentionally organization-defined choices.
