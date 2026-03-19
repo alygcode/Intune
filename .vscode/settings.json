@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "true": true,
+        "command": true,
+        "npx -y @openai/codex": true,
+        "codex": true
+    }
+}
