@@ -1,1059 +1,372 @@
-# Microsoft Intune Best Practice Guidance
+# Microsoft Intune Best-Practice Guide
 
-This document is designed as a dual-purpose asset:
-1. Deep-dive training curriculum for a 20-22 hour course.
-2. Day-to-day reference manual for IT administrators and security professionals.
+Enterprise guidance for a 5k-50k device environment with hybrid AD and Microsoft Entra ID history, moving to cloud-only management where practical. This guide is written to stand alone as a customer-ready README or to be split into chapters by section.
 
-Last validated against Microsoft Learn documentation: 2026-03-19.
+Last validated against Microsoft Learn guidance: 2026-03-19.
 
-Recommended pacing (20-22 hours):
-- Module 1-3 foundations: 4 hours
-- Module 4-6 deployment and controls: 8 hours
-- Module 7-8 apps and updates: 3 hours
-- Module 9-10 monitoring and analytics: 3 hours
-- Module 11 security integrations and operations: 2-4 hours
+## Executive Summary
 
-## 1.1 Course Overview: Intune Optimization Assessment Framework and Methodology
+For enterprises at this scale, Microsoft Intune should be the long-term endpoint control plane. Use Intune to own device enrollment, configuration, compliance, app delivery, update orchestration, and endpoint security integration. Keep identity, access, compliance, and servicing decisions aligned so the environment behaves predictably.
 
-What:
-- A structured assessment and improvement model for identity, enrollment, configuration, compliance, apps, updates, reporting, and security integration.
+For hybrid estates, co-management is usually a transition pattern, not the target architecture. New Windows endpoints should default to Microsoft Entra join, Windows Autopilot, Intune policy, and cloud-based access controls. Keep Configuration Manager only where a defined technical dependency still exists, and retire that dependency in planned waves.
 
-Why:
-- Prevents ad-hoc deployment, reduces operational drift, and aligns Intune with Zero Trust and measurable security outcomes.
+The design bias in this document is:
 
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Use a 5-phase cycle for each domain: Discover, Baseline, Prioritize, Implement, Validate.
-- Define measurable KPIs per phase (for example: enrollment success rate, compliance rate, patch latency, startup score, risk-based sign-in blocks).
-- Run optimization as a recurring quarterly program, not a one-time project.
+- Simplify to one primary control plane.
+- Standardize around reusable policy objects, not per-team exceptions.
+- Use virtual groups, filters, scope tags, RBAC, profiles, baselines, and rings to scale operations.
+- Validate licensing before design decisions are locked.
+- Treat Windows 11 as the mainstream endpoint platform, with separate servicing tracks for LTSC and fixed-function devices.
 
-Gotchas/Notes:
-- Many teams skip validation and only deploy policies. This causes hidden conflicts and poor user experience.
-- Build pilot cohorts by role, region, and platform before broad production rollout.
+## Quick-Start Checklist
 
-## 1.2 Licensing Requirements
+- Confirm licensing, cloud availability, and whether any target workloads depend on Intune Suite features.
+- Define device personas: corporate, BYOD, shared, frontline, EDU, kiosk, lab, VDI, and fixed-function.
+- Set an explicit target state for new Windows devices: Microsoft Entra join, Intune enrollment, standardized apps, and cloud access controls.
+- Set the MDM user scope intentionally. Do not leave automatic enrollment behavior to defaults or overlap it carelessly with WIP scope.
+- Establish naming standards, RBAC boundaries, scope tags, dynamic group strategy, and assignment filter rules before broad rollout.
+- Build pilot rings for enrollment, apps, security baselines, compliance, and Windows servicing before production targeting.
+- Standardize Win32 packaging, detection rules, uninstall paths, dependencies, supersedence, and restart behavior.
+- Define the co-management exit plan before moving workloads.
+- Configure compliance first, test Conditional Access in report-only mode, and enforce only after pilot validation.
+- Define lifecycle actions for retire, wipe, delete, reprovision, and stale-record cleanup.
 
-What:
-- Licensing tiers that unlock Intune and connected Microsoft security capabilities: EMS A3/E3/A5/E5, M365 A3/A5/G2/G5, Intune Plan 1/2/Suite, Windows 365, Defender for Endpoint, and device-only licenses.
+## Audience, Scope, and Assumptions
 
-Why:
-- Features like Endpoint Privilege Management, advanced analytics, and risk-based Conditional Access depend on specific SKUs.
+This guide targets endpoint engineering, identity, security, architecture, and operations teams running large enterprise tenants. It assumes:
 
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Standardize baseline on Intune Plan 1 + Entra ID P1 + Defender for Endpoint Plan 2 for security-focused enterprises.
-- Use Intune Suite add-ons only where required by use case and maturity.
-- Map each control to its license dependency before design approval.
+- A Windows-heavy estate with some macOS and mobile platforms.
+- Historical dependence on Active Directory, Group Policy, Configuration Manager, PKI, or hybrid join.
+- A strategic move toward cloud-only management where business and technical dependencies allow.
+- Multiple device personas that require different enrollment, access, app, and compliance patterns.
 
-Gotchas/Notes:
-- Some capabilities in Identity Protection, Endpoint Analytics advanced views, and EPM require premium licensing.
-- Mixed academic and commercial licensing can create feature inconsistency across user populations.
-- Intune admins typically require an Intune license assignment unless unlicensed admin access is explicitly configured.
-- Co-management auto-enrollment has specific licensing behavior (Intune co-management rights and Entra P1/P2 dependencies); validate this before rollout.
+One policy model will not fit all personas. Shared pools, frontline workflows, education environments, labs, kiosks, and fixed-function systems should be designed as explicit branches, not forced into the standard corporate endpoint model.
 
-## 1.3 Intune Add-ons
+## Operating Principles
 
-What:
-- Optional capabilities including Remote Help, Endpoint Privilege Management (EPM), Advanced Endpoint Analytics, Cloud PKI, Enterprise App Management, and Tunnel for MAM.
+1. Intune is the primary management plane unless a documented exception exists.
+2. One control should have one clear owner. Avoid split authority across Intune, Group Policy, and Configuration Manager.
+3. Build for repeatability. Reuse profiles, baselines, rings, filters, and dynamic groups instead of cloning objects.
+4. Pilot before enforcement. Use limited groups, report-only validation, and rollback criteria.
+5. Reduce exception debt. Every exception should have an owner, expiry, and review date.
+6. Optimize for operations, not just deployment. A design that cannot be monitored and supported at scale is not complete.
 
-Why:
-- Add-ons close operational and security gaps not covered by core MDM/MAM.
+## Licensing and Intune Suite Considerations
 
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Remote Help: enable role-based support with audit trails and secure elevation workflows.
-- EPM: use just-in-time elevation with explicit allowlists; remove local admin rights broadly.
-- Cloud PKI: use for certificate lifecycle simplification and cloud-native trust issuance.
-- Enterprise App Management: use for third-party app lifecycle standardization.
-- Tunnel for MAM: prefer for app-level private access on unmanaged/BYOD scenarios.
+Validate licensing before solution design. The most common design errors at enterprise scale come from assuming features are available everywhere, then redesigning late.
 
-Gotchas/Notes:
-- EPM policy sprawl can become unmanageable without strict app publisher/path/hash governance.
-- Tunnel design must account for latency, app dependency maps, and split tunnel requirements.
-- Intune add-ons are not supported in Sovereign clouds; confirm cloud environment support before design commitment.
+| Need | Common Licensing Path | Design Guidance |
+| --- | --- | --- |
+| Core MDM and MAM | Intune Plan 1 | Baseline requirement for most enterprise designs. |
+| Device-based or user-based access controls | Microsoft Entra ID P1 or P2 | Required for many Conditional Access and identity controls. |
+| Defender risk and security signal integration | Microsoft Defender for Endpoint | Strong fit where device risk should influence compliance or access. |
+| Advanced endpoint privilege, remote support, certificate, or app catalog capabilities | Intune Suite or eligible add-ons | Buy for specific operational outcomes, not by default. |
+| Shared device pools | Device licensing or correct user licensing model | Match licensing to the ownership and sign-in model. |
+| Education-specific administration | Intune for Education plus supporting education licensing | Use education workflows where schools need simplified administration. |
 
-## 2.1 Azure AD (Entra ID) Integration
+Use Intune Suite when there is a measurable problem to solve, such as privilege elevation, remote support, certificate lifecycle simplification, or third-party application standardization. Intune add-ons are currently not supported in sovereign clouds, so confirm cloud constraints before including them in target-state architecture.
 
-What:
-- Identity integration patterns: Entra Connect, Password Hash Sync (PHS), Pass-through Authentication (PTA), Hybrid Join vs Entra Join, and federation.
+## Tenant Hygiene and Governance
 
-Why:
-- Identity is the policy decision point for Zero Trust and Conditional Access.
+Large tenants fail operationally long before they fail technically. Governance should reduce ambiguity.
 
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Prefer PHS over PTA for resilience, cloud availability, and simpler operations.
-- Prefer Entra Join over Hybrid Join for new devices unless a strict legacy dependency exists.
-- Minimize federation complexity; use managed authentication where possible.
+Recommended practices:
 
-Gotchas/Notes:
-- Legacy line-of-business apps tied to AD Kerberos/NTLM may block a full Entra Join transition.
-- PTA introduces on-prem dependency and can become an outage risk.
+- Define naming standards for policies, profiles, apps, scripts, baselines, rings, groups, and filters.
+- Use RBAC and scope tags to limit administrative blast radius and support distributed IT models.
+- Use virtual groups, usually Microsoft Entra dynamic groups, only where the rule logic is stable and supportable.
+- Use assignment filters to refine targeting by device properties instead of duplicating groups unnecessarily.
+- Keep every object owned, reviewed, and retireable.
+- Record exception decisions and link them to business owners.
 
-## 2.2 MFA
+Avoid:
 
-What:
-- Multifactor authentication with Microsoft or third-party factors, including emergency access (break-glass) handling and legacy auth blocking.
+- A single global admin pattern for all endpoint work.
+- Dynamic groups with unclear logic or no lifecycle owner.
+- Recreating nearly identical profiles for every business unit.
+- Leaving everything on the default scope tag.
 
-Why:
-- MFA is one of the highest-impact controls against account compromise.
+## Identity and Access Foundation
 
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Enforce MFA using Conditional Access, not per-user MFA.
-- Maintain at least two emergency access accounts excluded from most controls, protected by strong passwords and offline monitoring.
-- Block legacy authentication protocols tenant-wide.
-- Deploy new MFA and block-legacy policies in report-only mode first, then move to enforced mode after impact review.
+Identity is the control point for Zero Trust. Device management and access policy must be designed together.
 
-Gotchas/Notes:
-- Break-glass accounts must be tested regularly and excluded only from necessary policies.
-- SMTP AUTH and older clients can silently bypass modern controls if not explicitly blocked.
+Recommended approach:
 
-## 2.3 User and Security Groups
+- Default new corporate Windows devices to Microsoft Entra join.
+- Use Conditional Access as the enforcement plane for MFA, device trust, session conditions, and app protection requirements.
+- Keep emergency access accounts excluded from normal Conditional Access enforcement and test them regularly.
+- Separate admin access policy from user access policy.
+- Use passwordless methods where operationally mature.
 
-What:
-- Group strategy including dynamic groups, admin role separation, tenant creation controls, and Global Admin governance.
+The MDM user scope must be set intentionally. Set it to `Some` or `All` only for the users who should automatically enroll, keep WIP scope separate, and avoid accidental overlap that changes enrollment behavior.
 
-Why:
-- Group design drives policy targeting, least privilege, and operational safety.
+## Enrollment Strategy
 
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Use dynamic device/user groups for lifecycle-based targeting.
-- Enforce strict admin separation by role (identity, endpoint, security, helpdesk).
-- Keep permanent Global Administrator assignments to the minimum operationally required, and use PIM for just-in-time elevation for all other privileged activity.
-- Disable default user ability to create tenants/apps where not needed.
+Design enrollment by device persona and ownership model, not by administrative convenience.
 
-Gotchas/Notes:
-- Dynamic group rules can be expensive and delayed in large tenants.
-- Overlapping assignments cause unpredictable effective policy outcomes.
+| Persona | Preferred Pattern | Notes |
+| --- | --- | --- |
+| Corporate Windows | Windows Autopilot plus automatic enrollment | Standard path for mainstream enterprise endpoints. |
+| BYOD mobile | App protection without full device enrollment where possible | Lower friction, better privacy posture, and usually enough control for productivity apps. |
+| Shared Windows | Shared device pattern with device-centric assignment | Avoid user-centric policy assumptions. |
+| Frontline dedicated mobile | Automated enrollment with shared device mode where supported | Optimize for shift sign-in and fast reprovisioning. |
+| Education | Intune for Education or school-managed workflow | Separate student, teacher, and classroom policies. |
+| Legacy or specialty devices | Exception path with explicit controls | Do not force standard enrollment where the device cannot support it cleanly. |
 
-## 2.4 Conditional Access
+Enrollment rules:
 
-What:
-- Policy engine controlling access based on identity, device compliance, location, client type, sign-in risk, and session settings.
+- Use automatic enrollment deliberately, not broadly by habit.
+- Keep corporate and BYOD paths separate.
+- Tie enrollment decisions to access policy, app model, and support model.
+- Do not require full MDM enrollment when app protection plus Conditional Access will meet the business requirement.
 
-Why:
-- Core Zero Trust enforcement layer for verify explicitly and assume breach principles.
+## Hybrid-to-Cloud Transition Guidance
 
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Implement in phased mode: report-only, pilot, production.
-- Enforce admin MFA and compliant-device requirements for privileged access.
-- Block legacy auth globally.
-- Require compliant or hybrid/Entra joined devices for sensitive apps.
-- For risk policies, use Microsoft-recommended defaults: separate user-risk and sign-in-risk policies, require MFA for medium/high sign-in risk, and require sign-in frequency set to Every time.
-- For non-risk-based session controls, define sign-in frequency by app sensitivity and business tolerance for reauthentication prompts.
-- Include named locations and risk-based controls via Identity Protection.
+Move from hybrid to cloud in waves. Do not announce a cloud-only end state until dependencies are inventoried and retirement sequencing is real.
 
-Gotchas/Notes:
-- Misconfigured exclusions are a common breach vector.
-- Sign-in frequency too aggressive can cause user friction and shadow IT behavior.
+Recommended sequence:
 
-## 2.5 Identity Governance
+1. Inventory current join states, enrollment methods, GPOs, Configuration Manager workloads, PKI dependencies, scripts, VPN and Wi-Fi profiles, and legacy authentication dependencies.
+2. Define the target state for new devices first.
+3. Pilot Microsoft Entra join, Autopilot, Intune policy, update rings, compliance, and app packaging with a controlled cohort.
+4. Migrate by persona, not by org chart alone.
+5. Retire legacy controls after the cloud path is stable, measurable, and supportable.
 
-What:
-- Controls for lifecycle and privileged access: PIM, Access Reviews, RBAC, app consent governance, entitlement management, and passwordless.
+Transition guidance:
 
-Why:
-- Reduces standing privilege, limits access creep, and improves audit posture.
+- Start with new device provisioning and refresh cycles before in-place conversion at scale.
+- Keep Group Policy analytics and settings rationalization as active workstreams.
+- Rebuild only the settings that still matter; do not replicate old GPO sprawl in Intune.
+- Keep certificate, wireless, VPN, and line-of-business authentication dependencies visible early.
 
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Use PIM for all privileged roles with approval and justification.
-- Schedule recurring Access Reviews for privileged groups and high-value apps.
-- Restrict user consent for risky app permissions; use admin consent workflow.
-- Deploy passwordless methods (FIDO2, Windows Hello for Business) with phishing-resistant defaults.
+## Co-Management vs Intune-Only Decision Guidance
 
-Gotchas/Notes:
-- Governance workflows fail when ownership is unclear; assign app/group owners explicitly.
-- Passwordless rollout needs fallback planning for edge cases and device loss.
+Intune-only is the preferred destination for most modern enterprise endpoints. Co-management is usually the bridge.
 
-## 3.1 Tenant Administration: Roles and Scope Tags
+| Choose Co-Management When | Choose Intune-Only When |
+| --- | --- |
+| Configuration Manager still owns a workload that cannot yet move cleanly. | Identity, apps, servicing, compliance, and support are ready for a single cloud-first control plane. |
+| You need to transition workloads in phases with minimal disruption. | New device builds are Microsoft Entra joined and Intune-led by default. |
+| You still depend on Configuration Manager content, tasking, or on-prem workflows. | Dual-management complexity no longer provides enough value. |
+| Pilot workload shifts are needed before broad change. | Operations, reporting, and troubleshooting improve by removing split authority. |
 
-What:
-- Intune RBAC and scope tags for delegated administration.
+Co-management rules:
 
-Why:
-- Supports least privilege and regional/business-unit separation.
+- Move one workload at a time.
+- Pilot every workload shift.
+- Document the exit criteria for every retained Configuration Manager dependency.
+- Do not leave workloads split indefinitely without a retirement plan.
 
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Create role profiles by function (L1 support, L2 endpoint, policy engineer, security ops).
-- Apply scope tags consistently to devices, policies, and apps.
+## App Lifecycle and Win32 Packaging
 
-Gotchas/Notes:
-- Missing scope tags can expose objects to broader admin audiences than intended.
+At enterprise scale, application management needs engineering discipline, not ad hoc packaging.
 
-## 3.2 Tenant Administration: Branding
+Recommended practices:
 
-What:
-- Company Portal and sign-in branding for end-user communication and trust.
+- Prefer Win32 apps for complex Windows application delivery.
+- Standardize packaging inputs, install commands, uninstall commands, detection rules, dependencies, supersedence, and restart expectations.
+- Keep packaging ownership separate from software approval ownership.
+- Use Delivery Optimization and content design intentionally for bandwidth-heavy deployments.
+- Build versioned app baselines so rollback and supersedence remain predictable.
 
-Why:
-- Improves enrollment completion and reduces helpdesk tickets.
+Operational specifics to preserve:
 
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Standardize naming, support contacts, and policy messaging across all portals.
-- Localize key guidance for major user regions.
+- The Intune Management Extension installs automatically when a Win32 app or a PowerShell script is assigned to a user or device.
+- The Win32 app size limit is 30 GB per app.
+- In classic Windows Autopilot enrollment that uses the Enrollment Status Page, avoid mixing Win32 and line-of-business apps in the same provisioning flow because app installation can fail. Win32 and line-of-business app mixing is supported in Windows Autopilot device preparation.
 
-Gotchas/Notes:
-- Inconsistent branding across Entra and Intune pages causes user confusion and phishing concern.
+Packaging checklist:
 
-## 3.3 Tenant Administration: Cleanup Rules
+- Use deterministic detection logic.
+- Define a tested uninstall path.
+- Model dependencies explicitly.
+- Use supersedence for version transitions.
+- Document whether installs are device-context or user-context.
 
-What:
-- Automatic stale device cleanup and object lifecycle hygiene.
+## Update Rings and Feature Updates
 
-Why:
-- Prevents ghost devices, improves reporting accuracy, and reduces policy targeting errors.
+Windows servicing should be opinionated and ring-based.
 
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Define cleanup thresholds by platform behavior and business lifecycle requirements; no single Microsoft default inactivity period applies to all tenants.
-- Align cleanup with HR offboarding and asset disposal processes.
+Use a Windows 11-first strategy for mainstream endpoints. Windows 10 should remain only on transition exceptions, ESU-covered populations, or hardware that cannot yet move. Keep LTSC and other fixed-function devices on separate servicing tracks with their own policy, app, and support assumptions.
 
-Gotchas/Notes:
-- Overly aggressive cleanup can remove seasonal or kiosk devices unintentionally.
+| Track | Purpose | Typical Population |
+| --- | --- | --- |
+| Pilot ring | Validate updates and app compatibility early | IT, engineering, support champions |
+| Broad ring | Standard enterprise servicing | Most corporate user endpoints |
+| Holdback ring | Short-term containment for known issues | Limited exception populations |
+| LTSC or fixed-function track | Stability-first servicing | Kiosk, OT-adjacent, fixed-purpose, validated devices |
 
-## 3.4 Tenant Administration: Categories and Filters
+Servicing rules:
 
-What:
-- Device categories and assignment filters to refine targeting.
+- Use separate policies for quality updates, feature updates, drivers, and firmware strategy.
+- If both an update ring and a feature update policy apply to a device, set the ring feature update deferral to `0`.
+- Keep rollback, pause, and communication procedures documented before broad deployment.
+- Validate app readiness and device readiness before moving feature update waves.
 
-Why:
-- Prevents policy duplication and enables precise assignments.
+## Security Baselines and Endpoint Protection
 
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Use filters for platform/version/manufacturer logic instead of cloning policies.
-- Use categories sparingly and only for meaningful operational segmentation.
+Use Intune security baselines as a starting point, then refine with endpoint security policies and Settings Catalog profiles where needed.
 
-Gotchas/Notes:
-- Too many filters make troubleshooting difficult; document filter intent and ownership.
+Recommended practices:
 
-## 3.5 Tenant Administration: Connector (Configuration Manager Co-management)
+- Start with Microsoft security baselines, then customize only where operationally justified.
+- Keep a baseline ownership model and version review cadence.
+- Use endpoint security profiles for antivirus, firewall, disk encryption, attack surface reduction, and account protection.
+- Integrate Microsoft Defender for Endpoint where risk, compliance, and response workflows should influence one another.
+- Use Intune Suite capabilities such as Endpoint Privilege Management, Remote Help, Cloud PKI, or Enterprise App Management only where the operating model clearly benefits.
 
-What:
-- Integration between Intune and Configuration Manager for workload transition.
+Avoid deploying overlapping baselines and profiles without conflict review.
 
-Why:
-- Enables staged migration from legacy endpoint management to cloud-first controls.
+## Compliance and Conditional Access Alignment
 
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Move workloads in sequence: compliance, resource access, endpoint protection, apps, updates.
-- Set clear co-management boundaries and exit criteria for each workload.
+Compliance policy is the device posture signal. Conditional Access is the enforcement layer. They must be designed together.
 
-Gotchas/Notes:
-- Conflicts occur when GPO, ConfigMgr, and Intune all target the same setting.
+Recommended practices:
 
-## 3.6 Tenant Administration: Custom Notifications
+- Build compliance policies before enabling compliant-device access requirements.
+- Set the tenant compliance default so devices with no compliance policy assigned are treated as not compliant when compliance drives access.
+- Use report-only mode for Conditional Access before enforcement.
+- Exclude emergency access accounts from normal enforcement.
+- Use device risk signals where Defender integration is in scope.
 
-What:
-- Intune notifications for remediation prompts and compliance actions.
+Access design guidance:
 
-Why:
-- Reduces non-compliance dwell time and improves user self-service.
+- Corporate managed devices: require compliant device where the app and user workflow justify it.
+- BYOD productivity access: prefer app-based Conditional Access and app protection policy where full enrollment is unnecessary.
+- Administrative access: use stricter controls than standard user access.
 
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Use clear call-to-action language with deadlines and support links.
-- Coordinate messaging with compliance grace periods.
+## Shared, Frontline, and Education Design Branches
 
-Gotchas/Notes:
-- Excessive notification volume leads to alert fatigue and lower remediation rates.
+These scenarios should be designed as explicit branches of the environment.
 
-## 3.7 Tenant Administration: Diagnostics and Troubleshooting
+### Windows Shared PC Mode
 
-What:
-- Built-in troubleshooting tools, logs, and support workflows.
+Use Windows shared PC mode for Windows devices that are intentionally shared by multiple users one at a time. Favor device-based app assignment, minimal user personalization, predictable sign-in behavior, and simplified recovery. For shared pools, operationally prefer reprovisioning over hand-tuning drifted devices.
 
-Why:
-- Faster root-cause identification reduces outage impact and helpdesk cost.
+### Mobile Shared Device Mode
 
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Standardize a troubleshooting runbook: identity check, assignment check, MDM authority, policy conflict, agent health.
-- Capture reproducible evidence (device timeline, logs, affected scope, recent changes).
+Use mobile shared device mode for eligible frontline iOS and iPadOS devices that pass between workers during the day. Build for fast sign-in and sign-out, device-based deployment, minimal required apps, and predictable session reset behavior.
 
-Gotchas/Notes:
-- Lack of change tracking is a major blocker during incident response.
+### Frontline BYOD
 
-## 4.1 Enrollment Strategy and Restrictions
+For personally owned frontline devices, default to app protection policy plus app-based Conditional Access before considering full MDM enrollment. Protect data at the app layer, require approved client apps where appropriate, and avoid imposing a corporate device-management model where it is not required.
 
-What:
-- Device enrollment restrictions by platform, version, ownership, and enrollment limits.
+### Intune for Education or School-Managed Workflows
 
-Why:
-- Controls attack surface and ensures only supported device types enter management.
+Use Intune for Education or school-managed workflows where the environment is optimized for student, teacher, and classroom administration rather than general enterprise endpoint operations. Separate student shared devices, teacher productivity devices, and classroom or assessment workflows. Use school-specific enrollment methods and Apple School Manager or education enrollment processes where they fit the operating model.
 
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Block unsupported OS versions by default.
-- Set enrollment limits to prevent abuse and stale multi-device accumulation.
-- Separate corporate-owned from BYOD with dedicated profiles and app protection policies.
+## Device Lifecycle and Cleanup
 
-Gotchas/Notes:
-- Misaligned restrictions can block legitimate provisioning waves.
-- Enrollment restrictions are not a primary security boundary; treat them as guardrails and pair with compliance and Conditional Access.
-- For many non-user-driven enrollments (for example Autopilot self-deploying or pre-provisioned flows), default restriction behavior applies.
+Lifecycle hygiene keeps assignments, reporting, and support accurate.
 
-## 4.2 Ownership Models: Corporate vs BYOD
+Recommended practices:
 
-What:
-- Enrollment ownership affects policy intensity, privacy scope, and lifecycle actions.
+- Define when to retire, wipe, delete, or reprovision.
+- Align offboarding with HR, asset, and support processes.
+- Keep reassignment workflows explicit for shared pools and classroom sets.
+- Review stale device records regularly.
 
-Why:
-- Corporate devices can support full security hardening; BYOD often requires privacy-preserving MAM.
+Operational specifics to preserve:
 
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Corporate: full MDM + compliance + security baseline + update governance.
-- BYOD: app protection policy first, minimal device controls, clear privacy disclosure.
-- For Apple devices, use ADE or corporate identifiers where possible to ensure accurate corporate ownership classification.
+- Cleanup rules hide inactive records from the Intune admin experience.
+- Cleanup rules do not wipe or retire devices.
+- Hidden devices can reappear if they check in again before certificate expiry.
 
-Gotchas/Notes:
-- Incorrect ownership tagging can apply invasive controls to personal devices.
+## Reporting and Monitoring
 
-## 4.3 Windows Enrollment: Autopilot, Windows 365, Co-management
+Use reporting to operate the environment, not just to present status.
 
-What:
-- Modern Windows provisioning and lifecycle via Autopilot profiles, Cloud PC integration, and phased co-management.
+Recommended KPIs:
 
-Why:
-- Reduces imaging overhead, accelerates secure provisioning, and supports remote-first operations.
+- Enrollment success rate
+- Compliance rate
+- App deployment success rate
+- Update latency by ring
+- Security baseline drift
+- Support volume after major policy changes
+- Stale device count and cleanup trend
 
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Use user-driven Autopilot for knowledge workers; pre-provision for high-volume or poor-network scenarios.
-- Enforce Entra Join + automatic MDM enrollment for greenfield deployments.
-- Integrate Windows 365 devices into the same compliance and Conditional Access framework.
+Recommended tooling:
 
-Gotchas/Notes:
-- Autopilot depends on accurate hardware hash import and network reachability to Microsoft endpoints.
-- Legacy line-of-business startup dependencies may require ESP optimization and staged app installs.
+- Built-in Intune operational reporting for day-to-day troubleshooting
+- Windows feature update readiness and organizational update reporting
+- Endpoint analytics for performance and experience trends
+- Log Analytics or other enterprise reporting platforms for cross-domain views
 
-## 4.4 macOS Enrollment: ADE/ABM and SSO
+## Practical Implementation Checklists
 
-What:
-- Apple device enrollment through Apple Business Manager and Automated Device Enrollment, plus enterprise SSO extension integration.
+### Design Checklist
 
-Why:
-- ADE ensures supervised management and stronger enterprise control on corporate Macs.
+- Validate licensing, cloud type, and Intune add-on availability.
+- Define target personas, support boundaries, and exceptions.
+- Decide the target state for new Windows devices.
+- Establish group, filter, scope tag, and RBAC strategy.
+- Map legacy dependencies that block cloud-only management.
 
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Use ABM federated identity and ADE for all corporate macOS devices.
-- Require supervised enrollment for strong security posture.
-- Deploy SSO extension to improve modern auth sign-in experience.
+### Pilot Checklist
 
-Gotchas/Notes:
-- Apple ecosystem requires APNs certificate hygiene and token renewal discipline.
-- macOS management parity with Windows is not complete for all controls.
+- Validate automatic enrollment and device registration behavior.
+- Validate Autopilot and enrollment experiences for each target persona.
+- Validate app install, update, uninstall, and reboot behavior.
+- Validate compliance evaluation and Conditional Access impact in report-only mode.
+- Validate update ring and feature update behavior in pilot cohorts.
 
-## 4.5 Linux Enrollment Options
+### Rollout Checklist
 
-What:
-- Linux management support in Intune for selected distributions and compliance scenarios.
+- Communicate the new support and access model.
+- Expand by ring, persona, and business criticality.
+- Monitor enrollment, app, compliance, and update telemetry daily.
+- Pause on repeated failure patterns.
+- Track every exception and assign an owner.
 
-Why:
-- Extends Conditional Access and compliance to developer and engineering endpoints.
+### Operations Checklist
 
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Use Linux enrollment primarily for device compliance and access gating.
-- Pair with Defender for Endpoint where supported for security signal enrichment.
+- Review stale records, cleanup rules, and device lifecycle actions.
+- Review policy overlap, filter sprawl, and dynamic group drift.
+- Review ring health, rollout timing, and feature-update readiness.
+- Review packaging standards, supersedence chains, and failed deployments.
+- Review privileged access, break-glass health, and support escalation quality.
 
-Gotchas/Notes:
-- Linux policy depth is narrower than Windows/macOS; do not assume feature parity.
+## Common Anti-Patterns
 
-## 4.6 ChromeOS and Other Platforms
+- Treating Intune as a one-for-one GPO replacement instead of a cloud control plane.
+- Leaving the MDM user scope broad or ambiguous.
+- Keeping co-management indefinitely because no one owns the exit plan.
+- Allowing the same setting to be managed by Intune, Group Policy, and Configuration Manager at the same time.
+- Designing one enrollment pattern for every persona.
+- Forcing full MDM enrollment on BYOD when app protection would meet the requirement.
+- Mixing Win32 and line-of-business apps during classic Windows Autopilot ESP enrollment without understanding the constraint.
+- Running the entire Windows estate on a single servicing ring.
+- Using Windows 10 as the default mainstream enterprise endpoint platform after October 14, 2025.
+- Assuming cleanup rules retire or wipe stale devices.
+- Buying Intune Suite capabilities without a defined operating problem to solve.
 
-What:
-- Intune integration options for ChromeOS and non-Windows endpoints.
+## Source Map
 
-Why:
-- Supports mixed endpoint estates and access governance consistency.
+Official Microsoft Learn references used to align this guide:
 
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Use platform-native management where required, and integrate identity/compliance signals with Entra Conditional Access.
-
-Gotchas/Notes:
-- Third-party platform connectors can have delayed telemetry and limited remediation actions.
-
-## 5.1 Compliance Strategy
-
-What:
-- Compliance policy framework that maps technical controls to business risk tiers.
-
-Why:
-- Compliance state is a key gate in Conditional Access.
-
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Build tiered compliance baselines: strict for privileged users, standard for workforce, exception profile for approved edge cases.
-- Tie every compliance rule to a risk statement and owner.
-
-Gotchas/Notes:
-- Too many custom rules can reduce maintainability and clarity.
-
-## 5.2 Compliance Status Validity
-
-What:
-- Compliance refresh frequency and validity windows.
-
-Why:
-- Stale status can allow risky access or trigger false blocks.
-
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Tune validity windows by risk: shorter for admins/high-risk apps, balanced for regular users.
-
-Gotchas/Notes:
-- Overly short validity can create frequent re-evaluation and user friction.
-
-## 5.3 Compliance Notifications
-
-What:
-- User communications for non-compliance detection and remediation.
-
-Why:
-- Fast user action reduces access disruptions and support load.
-
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Trigger notifications at first detection and before enforcement milestones.
-- Include self-help steps and escalation path.
-
-Gotchas/Notes:
-- Generic messaging without concrete steps leads to ticket spikes.
-
-## 5.4 Windows Compliance (Health, MDE Integration)
-
-What:
-- Windows compliance with secure boot, TPM, BitLocker, Defender health, and MDE risk signals.
-
-Why:
-- Combines configuration state with threat posture for stronger access control.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Enable Defender for Endpoint compliance integration.
-- Require BitLocker and healthy Defender anti-malware state.
-- Use device risk level thresholds aligned to business sensitivity.
-
-Gotchas/Notes:
-- MDE onboarding lag can temporarily impact compliance status during rollout.
-
-## 5.5 macOS Compliance
-
-What:
-- macOS device compliance controls such as OS version and disk encryption state.
-
-Why:
-- Ensures baseline hygiene for enterprise Apple endpoints.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Enforce minimum supported macOS versions and FileVault encryption.
-- Use staged deadlines for major OS transitions.
-
-Gotchas/Notes:
-- Apple release cadence can outpace enterprise validation timelines.
-
-## 5.6 Linux Compliance
-
-What:
-- Linux compliance checks available through Intune integration.
-
-Why:
-- Enables Conditional Access decisions for Linux endpoints.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Use Linux compliance for access gating, then augment hardening with platform-native tools.
-
-Gotchas/Notes:
-- Limited control coverage means security baselines require external tooling.
-
-## 5.7 Actions for Non-compliance
-
-What:
-- Automated action chain such as notify, grace period, block access, retire/wipe.
-
-Why:
-- Converts policy drift into enforceable remediation timeline.
-
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Apply progressive enforcement: immediate user notification, short grace period, then access block.
-- Reserve retire/wipe for corporate-owned severe cases.
-
-Gotchas/Notes:
-- Aggressive wipe policies can create high business disruption if triggered incorrectly.
-
-## 6.1 Windows Configuration: Settings Catalog
-
-What:
-- Centralized policy configuration model for modern Windows controls.
-
-Why:
-- Replaces many classic GPO scenarios in cloud-managed environments.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Prefer Settings Catalog for new policy design.
-- Group policies by domain (security, experience, network, privacy) with clear naming standards.
-
-Gotchas/Notes:
-- Duplicate settings across profiles can create conflict and ambiguous troubleshooting.
-
-## 6.2 Windows Configuration: ADMX Ingestion and GPO Transition
-
-What:
-- ADMX-backed policy support for legacy settings not yet in native catalog.
-
-Why:
-- Enables phased migration from on-prem GPO to cloud policy management.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Inventory current GPOs and classify as retire, replace, or migrate.
-- Use ADMX ingestion only where Settings Catalog is unavailable.
-- Maintain a policy source-of-truth map to avoid dual control.
-- Use Group Policy Analytics to migrate settings into Settings Catalog, then rationalize conflicts before broad deployment.
-
-Gotchas/Notes:
-- GPO and Intune conflicts are common in hybrid estates; document authority by setting.
-- Firewall and AppLocker settings are often better managed through Intune Endpoint Security workloads than direct migration.
-- GPO migration is best effort; some settings map to alternate CSP-backed settings instead of one-to-one parity.
-
-## 6.3 Windows Configuration: BitLocker
-
-What:
-- Device encryption and recovery key escrow managed by Intune.
-
-Why:
-- Protects data at rest and supports regulatory requirements.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Enable BitLocker silently for supported hardware.
-- Escrow recovery keys to Entra and validate retrieval process.
-- Require TPM-based protection and block weaker configurations.
-
-Gotchas/Notes:
-- Existing third-party encryption can interfere with policy enablement.
-
-## 6.4 Windows Configuration: Security Baselines
-
-What:
-- Microsoft-curated baseline templates for endpoint hardening.
-
-Why:
-- Accelerates secure configuration with tested defaults.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Deploy Security Baseline and Defender Baseline to pilot groups first.
-- Compare baseline settings against existing controls and tune exceptions deliberately.
-- Re-baseline after major Windows releases.
-
-Gotchas/Notes:
-- Blindly accepting all baseline settings can break app compatibility.
-
-## 6.5 Windows Configuration: Scripts
-
-What:
-- PowerShell scripts for one-time or recurring endpoint configuration tasks.
-
-Why:
-- Handles edge cases and custom enterprise requirements.
-
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Keep scripts idempotent, signed where possible, and version controlled.
-- Use scripts to bridge temporary gaps, then replace with native policy controls.
-
-Gotchas/Notes:
-- Script sprawl becomes technical debt quickly without ownership and lifecycle controls.
-
-## 6.6 Windows Configuration: Proactive Remediations
-
-What:
-- Detection and remediation script pairs for continuous endpoint hygiene.
-
-Why:
-- Shifts operations from reactive break-fix to proactive correction.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Target high-frequency issues first (stuck services, misconfigurations, cert drift).
-- Track remediation success rate and mean time to recover.
-
-Gotchas/Notes:
-- Poorly scoped remediations can cause repeated configuration churn.
-
-## 6.7 macOS Configuration
-
-What:
-- macOS settings management via Settings Catalog, FileVault policies, and shell scripts.
-
-Why:
-- Provides enterprise control while accommodating Apple platform differences.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Use Settings Catalog for standard controls, FileVault enforcement for encryption, and minimal shell scripts for gaps.
-- Validate major changes against multiple macOS versions.
-
-Gotchas/Notes:
-- Some Windows-equivalent controls do not exist on macOS; document accepted risk.
-
-## 6.8 Linux Configuration
-
-What:
-- Linux configuration options and integration patterns in Intune-based management.
-
-Why:
-- Supports consistent governance for mixed-platform organizations.
-
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Use Intune for identity/compliance anchoring, and combine with configuration management tools for deeper hardening.
-
-Gotchas/Notes:
-- Linux policy artifacts and remediation tooling in Intune are still evolving.
-
-## 7.1 Windows Apps: Microsoft Store and Microsoft 365 Apps
-
-What:
-- Application deployment through new Store integration and Microsoft 365 Apps profiles.
-
-Why:
-- Simplifies app lifecycle and standardizes productivity stack.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Prefer new Store app type for supported apps.
-- Use Microsoft 365 Apps deployment with update channel governance aligned to release rings.
-
-Gotchas/Notes:
-- Inconsistent channels across user groups can complicate support.
-
-## 7.2 Windows Apps: Win32 and LOB Packaging
-
-What:
-- Custom Win32 (.intunewin) and line-of-business app deployment.
-
-Why:
-- Required for enterprise apps not available in Store.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Enforce packaging standards: detection rules, return codes, supersedence, dependencies.
-- Use requirement rules to avoid unsupported target installs.
-
-Gotchas/Notes:
-- Weak detection logic is a major source of repeated install failures.
-
-## 7.3 macOS Apps: DMG/PKG and Microsoft 365
-
-What:
-- macOS app deployment using PKG/DMG packages and M365 for Mac.
-
-Why:
-- Ensures consistent application baseline for Apple endpoints.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Prefer signed PKG installers with tested uninstall behavior.
-- Manage Office update channel intentionally for pilot and broad cohorts.
-
-Gotchas/Notes:
-- DMG packaging can have limited uninstall or state detection reliability.
-
-## 7.4 App Categories and Targeting
-
-What:
-- Logical app categorization and assignment design.
-
-Why:
-- Improves user portal discoverability and deployment governance.
-
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Classify apps by business function and criticality.
-- Separate required, available, and uninstall intents clearly.
-
-Gotchas/Notes:
-- Overlapping assignments between required and uninstall can produce loops.
-
-## 8.1 Updates: Windows Update for Business, Autopatch, macOS Policies
-
-What:
-- Update governance across feature, quality, and driver updates; ring strategy; Autopatch; and macOS update controls.
-
-Why:
-- Timely patching lowers exploit exposure and supports compliance obligations.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Move from WSUS dependency to cloud-native Windows Update for Business rings.
-- Use staged deployment rings (for example test, pilot, broad production), with ring count and pacing defined by organizational risk tolerance and app compatibility requirements.
-- Use expedited quality updates for zero-day response.
-- Evaluate driver updates separately with staged rollout.
-- Use Windows Autopatch where operational model supports managed cadence.
-- On macOS, enforce minimum OS with deferral windows aligned to app validation.
-
-Gotchas/Notes:
-- Ring assignment errors can produce simultaneous broad deployment and high blast radius.
-- Feature update pinning requires explicit lifecycle tracking.
-- Windows LTSC devices support quality updates but have feature-update control limitations; segment LTSC targeting explicitly.
-- Ensure required update prerequisites and services are healthy on clients (for example endpoint reachability and update client dependencies).
-
-## 9.1 Reporting: Native Intune Reports
-
-What:
-- Built-in operational and compliance reports for devices, policies, apps, and updates.
-
-Why:
-- Provides baseline visibility for daily endpoint operations.
-
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Define report review cadence by audience: daily ops, weekly engineering, monthly governance.
-
-Gotchas/Notes:
-- Native reports alone are often insufficient for long-term trend analysis.
-
-## 9.2 Reporting: Workbooks
-
-What:
-- Azure Monitor workbooks for visualized operational and security metrics.
-
-Why:
-- Enables multi-source insights and executive-ready dashboards.
-
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Build role-specific workbook views (SOC, endpoint ops, leadership).
-- Standardize key KPIs: compliance trend, remediation time, update latency, high-risk sign-ins.
-
-Gotchas/Notes:
-- Dashboard quality depends on consistent data ingestion and schema understanding.
-
-## 9.3 Endpoint Analytics: Startup Performance
-
-What:
-- Metrics on boot and sign-in performance, startup impact, and device experience.
-
-Why:
-- Poor startup experience drives productivity loss and support volume.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Set threshold-based investigations for low-performing cohorts.
-- Correlate startup regressions with app/policy changes.
-
-Gotchas/Notes:
-- Hardware variance can skew interpretation if cohorts are not normalized.
-- Endpoint Analytics depends on required diagnostic data flow and telemetry service health; verify data prerequisites early.
-
-## 9.4 Endpoint Analytics: Reliability and User Experience
-
-What:
-- Device reliability indicators and user experience scoring.
-
-Why:
-- Identifies chronic instability before it becomes an incident.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Use reliability score trends to prioritize engineering backlog.
-- Tie repeated reliability drops to proactive remediation campaigns.
-
-Gotchas/Notes:
-- Ignoring statistical significance can lead to false-positive investigations.
-
-## 9.5 Monitoring Device and App Status
-
-What:
-- Continuous tracking of policy, configuration, and app deployment states.
-
-Why:
-- Early detection of failed rollouts reduces business impact.
-
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Establish SLOs for deployment success and remediation windows.
-- Alert on exception thresholds, not only absolute failures.
-
-Gotchas/Notes:
-- Alerting without runbooks creates noise but little operational improvement.
-
-## 10.1 Advanced Analytics: Power BI and Intune Data Warehouse
-
-What:
-- Structured data export for custom analytics, trend modeling, and governance reporting.
-
-Why:
-- Supports enterprise-level insights beyond portal-native reporting.
-
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Build semantic models around device lifecycle, compliance drift, app health, and update velocity.
-- Use row-level security in Power BI for delegated visibility.
-
-Gotchas/Notes:
-- Data model drift can break dashboards after schema changes.
-
-## 10.2 Advanced Analytics: WUfB Reports
-
-What:
-- Dedicated Windows update readiness and deployment telemetry reporting.
-
-Why:
-- Improves confidence in patch quality and rollout progression.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Track safeguard holds, error codes, and rollback signals before moving rings forward.
-
-Gotchas/Notes:
-- Missing diagnostic data settings can reduce report completeness.
-
-## 10.3 Advanced Analytics: Log Analytics
-
-What:
-- Central telemetry workspace for query, correlation, alerting, and retention.
-
-Why:
-- Foundation for proactive operations and cross-domain incident investigation.
-
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Route critical endpoint, identity, and security tables to a governed workspace with retention policy.
-- Use actionable alert rules tied to incident playbooks.
-
-Gotchas/Notes:
-- Uncontrolled ingestion can drive cost growth; use table-level planning.
-
-## 10.4 Advanced Analytics: KQL Practices
-
-What:
-- Kusto Query Language for deep telemetry analysis and automation logic.
-
-Why:
-- Enables custom detection of anomalies and operational failures.
-
-Best Practice Recommendation:
-- Classification: `[ORG-DEFINED]` Organization-defined choice
-- Standardize reusable KQL functions for common analyses: deployment failure outliers, compliance drift, risky sign-in correlation.
-- Version control critical KQL queries.
-
-Gotchas/Notes:
-- Query performance can degrade without filtering and summarization discipline.
-
-## 11.1 Integration: Entra Identity Protection (Risk)
-
-What:
-- User and sign-in risk scoring integrated into Conditional Access.
-
-Why:
-- Adds adaptive controls based on threat intelligence and behavior anomalies.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Require password change and stronger auth for medium/high user risk.
-- Block high sign-in risk for privileged accounts by default.
-- Keep user-risk and sign-in-risk controls in separate Conditional Access policies for clearer operations and safer tuning.
-
-Gotchas/Notes:
-- Risk policy tuning must balance false positives and security sensitivity.
-- For risk-based policies, report-only deployment and emergency access exclusions are mandatory operational safeguards.
-
-## 11.2 Integration: Defender for Cloud Apps (Session Controls)
-
-What:
-- Conditional Access App Control and session governance for SaaS activity.
-
-Why:
-- Provides real-time control over risky sessions, downloads, and data exfiltration.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Apply session controls to unmanaged or high-risk sessions for sensitive apps.
-- Start with monitor mode, then enforce block/protect actions based on observed behavior.
-
-Gotchas/Notes:
-- Proxy-based session control can affect app performance and compatibility.
-
-## 11.3 Integration: Defender for Identity
-
-What:
-- On-prem identity threat detection for lateral movement and credential abuse.
-
-Why:
-- Bridges hybrid identity attack paths that cloud-only monitoring can miss.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Integrate Defender for Identity alerts into SOC workflow and correlate with Entra risk events.
-
-Gotchas/Notes:
-- Sensor deployment coverage gaps reduce detection fidelity.
-
-## 11.4 Integration: Defender for Endpoint (EDR and TVM)
-
-What:
-- Endpoint detection and response plus threat and vulnerability management signals integrated with Intune.
-
-Why:
-- Enables risk-based compliance, stronger response automation, and prioritized remediation.
-
-Best Practice Recommendation:
-- Classification: `[MS-RECOMMENDED]` Microsoft recommended pattern
-- Onboard all supported endpoints to MDE and enforce tamper protection.
-- Use TVM exposure scores to prioritize patching and remediation policies.
-- Integrate device risk with Conditional Access and compliance for closed-loop enforcement.
-
-Gotchas/Notes:
-- Partial onboarding creates blind spots and inconsistent compliance decisions.
-
-## Implementation Blueprint (Recommended Order)
-
-1. Identity foundation first: MFA, legacy auth block, Conditional Access baseline, break-glass validation.
-2. Enrollment and ownership model: corporate vs BYOD, Autopilot profiles, ADE integration.
-3. Compliance and security baselines: Windows first, then macOS, then Linux scope.
-4. Configuration migration: GPO rationalization, Settings Catalog adoption, ADMX only where needed.
-5. Application and updates modernization: Win32 standards, WUfB ring strategy, Autopatch evaluation.
-6. Monitoring and analytics: Endpoint Analytics, Log Analytics, workbook-driven proactive operations.
-7. Security signal integration: Identity Protection, Defender suite, risk-based adaptive controls.
-
-## Operational Guardrails
-
-- Change control:
-1. Use ringed rollout for every major policy.
-2. Require documented rollback criteria.
-
-- Documentation:
-1. Maintain policy catalog with owner, intent, scope, and license dependency.
-2. Track exceptions with expiration dates and compensating controls.
-
-- Metrics:
-1. Set organization-defined enrollment success and compliance targets aligned to business risk, device diversity, and support capacity.
-3. Critical patch deployment within defined SLA by ring.
-4. Mean time to remediate repeated endpoint issues trending downward quarter over quarter.
-
-This guidance reflects an enterprise standard posture emphasizing Zero Trust identity, cloud-native endpoint governance, reduced legacy dependency, and proactive security operations.
-
-## Microsoft Learn Reference Set (Validated)
-
-Identity and Conditional Access:
-- https://learn.microsoft.com/entra/identity/hybrid/connect/choose-ad-authn
-- https://learn.microsoft.com/entra/identity/conditional-access/plan-conditional-access
-- https://learn.microsoft.com/entra/identity/conditional-access/policy-block-legacy-authentication
-- https://learn.microsoft.com/entra/id-protection/howto-identity-protection-configure-risk-policies
-
-Licensing and Add-ons:
-- https://learn.microsoft.com/intune/fundamentals/licensing/
-- https://learn.microsoft.com/intune/intune-service/fundamentals/intune-add-ons
-
-Enrollment and Ownership:
-- https://learn.microsoft.com/intune/intune-service/enrollment/enrollment-restrictions-set
-- https://learn.microsoft.com/intune/intune-service/fundamentals/deployment-guide-enrollment-windows
-
-Configuration and GPO Transition:
-- https://learn.microsoft.com/intune/intune-service/configuration/group-policy-analytics-migrate
-- https://learn.microsoft.com/intune/intune-service/configuration/administrative-templates-windows
-
-Updates:
-- https://learn.microsoft.com/intune/device-updates/windows/update-rings
-- https://learn.microsoft.com/intune/device-updates/windows/feature-updates
-- https://learn.microsoft.com/intune/device-updates/windows/quality-updates
-
-Monitoring and Security Integration:
-- https://learn.microsoft.com/intune/endpoint-analytics/
-- https://learn.microsoft.com/intune/intune-service/protect/microsoft-defender-with-intune
-- https://learn.microsoft.com/defender-endpoint/conditional-access
-
-## Recommendation Classification Legend
-
-- `[MS-EXPLICIT]` Microsoft explicit default: Documented Microsoft default or directly prescribed setting value/behavior.
-- `[MS-RECOMMENDED]` Microsoft recommended pattern: Microsoft-recommended architecture or deployment approach without a single hardcoded tenant value.
-- `[ORG-DEFINED]` Organization-defined choice: Must be tuned to business risk, legal requirements, platform mix, or operational model.
-
-## Recommendation Classification Index
-
-1.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
-1.2: `[MS-RECOMMENDED]` Microsoft recommended pattern
-1.3: `[MS-RECOMMENDED]` Microsoft recommended pattern
-
-2.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
-2.2: `[MS-RECOMMENDED]` Microsoft recommended pattern
-2.3: `[ORG-DEFINED]` Organization-defined choice
-2.4: `[MS-RECOMMENDED]` Microsoft recommended pattern
-2.5: `[MS-RECOMMENDED]` Microsoft recommended pattern
-
-3.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
-3.2: `[ORG-DEFINED]` Organization-defined choice
-3.3: `[ORG-DEFINED]` Organization-defined choice
-3.4: `[ORG-DEFINED]` Organization-defined choice
-3.5: `[MS-RECOMMENDED]` Microsoft recommended pattern
-3.6: `[ORG-DEFINED]` Organization-defined choice
-3.7: `[MS-RECOMMENDED]` Microsoft recommended pattern
-
-4.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
-4.2: `[MS-RECOMMENDED]` Microsoft recommended pattern
-4.3: `[MS-RECOMMENDED]` Microsoft recommended pattern
-4.4: `[MS-RECOMMENDED]` Microsoft recommended pattern
-4.5: `[MS-RECOMMENDED]` Microsoft recommended pattern
-4.6: `[ORG-DEFINED]` Organization-defined choice
-
-5.1: `[ORG-DEFINED]` Organization-defined choice
-5.2: `[ORG-DEFINED]` Organization-defined choice
-5.3: `[ORG-DEFINED]` Organization-defined choice
-5.4: `[MS-RECOMMENDED]` Microsoft recommended pattern
-5.5: `[MS-RECOMMENDED]` Microsoft recommended pattern
-5.6: `[MS-RECOMMENDED]` Microsoft recommended pattern
-5.7: `[ORG-DEFINED]` Organization-defined choice
-
-6.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
-6.2: `[MS-RECOMMENDED]` Microsoft recommended pattern
-6.3: `[MS-RECOMMENDED]` Microsoft recommended pattern
-6.4: `[MS-RECOMMENDED]` Microsoft recommended pattern
-6.5: `[ORG-DEFINED]` Organization-defined choice
-6.6: `[MS-RECOMMENDED]` Microsoft recommended pattern
-6.7: `[MS-RECOMMENDED]` Microsoft recommended pattern
-6.8: `[ORG-DEFINED]` Organization-defined choice
-
-7.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
-7.2: `[MS-RECOMMENDED]` Microsoft recommended pattern
-7.3: `[MS-RECOMMENDED]` Microsoft recommended pattern
-7.4: `[ORG-DEFINED]` Organization-defined choice
-
-8.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
-
-9.1: `[ORG-DEFINED]` Organization-defined choice
-9.2: `[ORG-DEFINED]` Organization-defined choice
-9.3: `[MS-RECOMMENDED]` Microsoft recommended pattern
-9.4: `[MS-RECOMMENDED]` Microsoft recommended pattern
-9.5: `[ORG-DEFINED]` Organization-defined choice
-
-10.1: `[ORG-DEFINED]` Organization-defined choice
-10.2: `[MS-RECOMMENDED]` Microsoft recommended pattern
-10.3: `[ORG-DEFINED]` Organization-defined choice
-10.4: `[ORG-DEFINED]` Organization-defined choice
-
-11.1: `[MS-RECOMMENDED]` Microsoft recommended pattern
-11.2: `[MS-RECOMMENDED]` Microsoft recommended pattern
-11.3: `[MS-RECOMMENDED]` Microsoft recommended pattern
-11.4: `[MS-RECOMMENDED]` Microsoft recommended pattern
-
-Notes:
-- User-risk and sign-in-risk policies in 11.1 have Microsoft explicit defaults available in current guidance (for example, sign-in risk medium/high with MFA, risk remediation controls, and report-only to enforced rollout path).
-- Most enrollment thresholds, cleanup windows, ring pacing, and KPI targets are intentionally organization-defined choices.
+| Topic | Microsoft Learn |
+| --- | --- |
+| Intune overview and planning | https://learn.microsoft.com/en-us/intune/ |
+| Intune licensing | https://learn.microsoft.com/en-us/intune/intune-service/fundamentals/licenses |
+| Assign Intune licenses | https://learn.microsoft.com/en-us/intune/fundamentals/licensing/assign-licenses |
+| Intune add-ons and sovereign cloud limitation | https://learn.microsoft.com/en-us/intune/intune-service/fundamentals/intune-add-ons |
+| Windows automatic enrollment and MDM user scope | https://learn.microsoft.com/en-us/intune/intune-service/enrollment/windows-enroll |
+| Assignment filters | https://learn.microsoft.com/en-us/mem/intune/fundamentals/filters |
+| RBAC and scope tags | https://learn.microsoft.com/en-us/intune/intune-service/fundamentals/scope-tags |
+| Co-management overview | https://learn.microsoft.com/en-us/intune/configmgr/comanage/overview |
+| Win32 app management, IME behavior, 30 GB limit, and Autopilot caution | https://learn.microsoft.com/en-us/mem/intune/apps/apps-win32-app-management |
+| Windows Autopilot device preparation FAQ | https://learn.microsoft.com/en-us/autopilot/device-preparation/faq |
+| Windows feature update policy guidance | https://learn.microsoft.com/en-us/intune/device-updates/windows/feature-update-policy |
+| Device cleanup rules | https://learn.microsoft.com/en-us/intune/intune-service/fundamentals/device-cleanup-rules |
+| Intune security baselines | https://learn.microsoft.com/en-us/mem/intune/protect/security-baselines |
+| Device compliance policy guidance | https://learn.microsoft.com/en-us/mem/intune/protect/device-compliance-get-started |
+| Require device compliance with Conditional Access | https://learn.microsoft.com/en-us/mem/intune/protect/create-conditional-access-intune |
+| App protection policy overview | https://learn.microsoft.com/en-us/mem/intune/apps/app-protection-policy |
+| App-based Conditional Access | https://learn.microsoft.com/en-us/intune/intune-service/protect/app-based-conditional-access-intune-create |
+| Windows shared PC mode settings | https://learn.microsoft.com/en-us/intune/intune-service/configuration/shared-user-device-settings-windows |
+| Shared device mode enrollment for iOS/iPadOS | https://learn.microsoft.com/en-us/intune/intune-service/enrollment/device-enrollment-program-enroll-ios |
+| Intune for Education overview | https://learn.microsoft.com/en-us/intune-education/what-is-intune-for-education |
+| School enrollment guidance | https://learn.microsoft.com/en-us/intune-education/how-should-i-enroll-devices |
+| Endpoint analytics | https://learn.microsoft.com/en-us/intune/analytics/overview |
+| Windows 10 end of support and migration context | https://learn.microsoft.com/en-us/lifecycle/announcements/windows-10-end-of-support |

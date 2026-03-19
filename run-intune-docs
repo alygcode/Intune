@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  cat <<'HELP'
+Usage:
+  ./run-intune-docs [optional additional context]
+
+Examples:
+  ./run-intune-docs
+  ./run-intune-docs "Focus on EDU and frontline device scenarios"
+
+Behavior:
+  - Runs Codex in non-interactive mode (codex exec)
+  - Uses AGENTS.md instructions and intune_docs_pipeline stage sequence
+  - Writes final output to README.md
+HELP
+  exit 0
+fi
+
+if ! command -v codex >/dev/null 2>&1; then
+  echo "Error: codex command not found in PATH." >&2
+  echo "Fix: ensure ~/.local/bin is in PATH or reinstall codex wrapper." >&2
+  exit 127
+fi
+
+login_status="$(codex login status 2>&1 || true)"
+if ! grep -Eqi "logged in|authenticated" <<<"$login_status"; then
+  echo "Error: Codex is not authenticated." >&2
+  echo "Current status: $login_status" >&2
+  echo "Run one of these first:" >&2
+  echo "  codex login" >&2
+  echo "  printenv OPENAI_API_KEY | codex login --with-api-key" >&2
+  exit 1
+fi
+
+extra_context="${*:-}"
+
+base_prompt=$(cat <<'PROMPT'
+Read AGENTS.md and execute the intune_docs_pipeline end-to-end using this sequence:
+architecture -> research -> writing -> review -> editing.
+
+Generate a full enterprise Microsoft Intune best-practice guide for 5k-50k devices,
+including hybrid-to-cloud transition guidance, co-management vs Intune-only decisions,
+and Intune Suite considerations.
+
+Output requirements:
+- Write final polished markdown to README.md
+- Keep recommendations aligned with current Microsoft Learn guidance
+- Include practical implementation checklists and common anti-patterns
+PROMPT
+)
+
+if [[ -n "$extra_context" ]]; then
+  final_prompt="$base_prompt
+
+Additional context from user:
+$extra_context"
+else
+  final_prompt="$base_prompt"
+fi
+
+# Isolate npm cache to avoid occasional compromised-lock cache issues in shared environments.
+export npm_config_cache="${npm_config_cache:-/tmp/npm-cache-intune}"
+
+cd "$(dirname "$0")"
+codex exec -s workspace-write --disable shell_snapshot --ephemeral "$final_prompt"
