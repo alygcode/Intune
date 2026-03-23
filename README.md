@@ -136,6 +136,82 @@ Enrollment rules:
 - Tie enrollment decisions to access policy, app model, and support model.
 - Do not require full MDM enrollment when app protection plus Conditional Access will meet the business requirement.
 
+## Windows Autopilot Deployment Best Practices
+
+Autopilot should be treated as a provisioning service with clear engineering controls, not only as an enrollment switch. The objective is predictable day-0 readiness with low help-desk load.
+
+### Deployment Model Decisions
+
+- Set one preferred default for new corporate Windows devices: Microsoft Entra join plus Intune-managed Autopilot.
+- Use profile types intentionally:
+	- User-driven: standard corporate knowledge-worker devices.
+	- Self-deploying or shared patterns: kiosk/shared and certain frontline scenarios.
+	- Pre-provisioning: when shipping and first-day productivity requirements justify the added process.
+- Keep co-management and hybrid dependencies out of new-build profiles unless a documented workload dependency still exists.
+
+| Autopilot Profile Pattern | Best Fit | Strengths | Common Gotchas |
+| --- | --- | --- | --- |
+| User-driven Microsoft Entra join | Standard corporate named-user devices | Familiar first-use flow and strong fit for modern cloud-managed endpoints | Bloated ESP blocking app sets can delay day-0 productivity |
+| Self-deploying mode | Shared, kiosk, and fixed-purpose devices | Device-centric provisioning with less dependency on end-user setup flow | Requires clear hardware support validation and persona-specific app minimization |
+| Pre-provisioning | Remote-shipped devices and accelerated day-1 readiness scenarios | Speeds end-user readiness by completing core setup before delivery | Extra process complexity in supply chain and staging workflows |
+
+Decision guidance:
+
+- Default to user-driven for mainstream named-user endpoints.
+- Use self-deploying mode only for true shared or fixed-purpose scenarios.
+- Use pre-provisioning when reduced first-day setup time outweighs added logistics overhead.
+
+### Device Preparation vs Classic Autopilot Planning
+
+- Decide per persona whether to use Windows Autopilot device preparation or classic Autopilot workflow.
+- Keep app and policy payloads minimal at provisioning time; move non-critical payloads post-enrollment.
+- Where classic Autopilot ESP is used, avoid mixing Win32 and line-of-business apps during provisioning.
+- Use device preparation where supported if provisioning reliability improves for your app mix.
+
+### Enrollment Status Page (ESP) and App Strategy
+
+- Keep ESP blocking apps to the minimum set required for secure productivity.
+- Prioritize baseline identity, security, connectivity, and support tooling before optional apps.
+- Set deterministic app detection and restart behavior for any app that can block user access.
+- Test first-sign-in and first-day experience in every pilot wave, including constrained network paths.
+
+### Hardware, Registration, and Supply-Chain Controls
+
+- Standardize hardware and TPM readiness requirements with procurement and OEM partners.
+- Define who owns hardware hash registration and validation in each supply path.
+- Use naming standards, group tags, and dynamic group logic that map to personas and rollout rings.
+- Validate order-to-enrollment telemetry so device records and intended profile assignments match.
+
+### Ring-Based Rollout and Quality Gates
+
+| Ring | Primary Objective | Promotion Gate |
+| --- | --- | --- |
+| Lab | Validate profile settings and required apps on reference hardware | No blocking provisioning failures across core hardware models |
+| Pilot | Validate real-user onboarding and support readiness | Target completion rates and acceptable ticket volume |
+| Broad | Scale by geography/business unit waves | Stable completion metrics and no unresolved critical issues |
+| Holdback | Temporary containment for edge cases | Documented remediation plan and expiry for exceptions |
+
+Autopilot promotion should freeze automatically when repeated provisioning failures cross threshold.
+
+### Operational Metrics and Runbooks
+
+- Track Autopilot success rate by profile, hardware model, region, and network path.
+- Track median time to ready state and first-day incident volume.
+- Maintain runbooks for:
+	- device registration mismatch,
+	- profile assignment failure,
+	- ESP timeout or blocked app install,
+	- post-reset reprovisioning failure.
+- Define ownership boundaries between endpoint engineering, identity, support desk, and OEM operations.
+
+### Common Autopilot Anti-Patterns
+
+- Treating Autopilot as a one-time project instead of a continuously measured provisioning service.
+- Blocking ESP on too many apps or non-essential payloads.
+- Reusing one profile for all personas without shared/frontline/kiosk distinctions.
+- Skipping pilot hardware diversity and discovering model-specific issues in broad rollout.
+- Leaving registration and group-tag quality controls undefined across supply-chain teams.
+
 ## Hybrid-to-Cloud Transition Guidance
 
 Move from hybrid to cloud in waves. Do not announce a cloud-only end state until dependencies are inventoried and retirement sequencing is real.
@@ -237,6 +313,48 @@ Recommended practices:
 - Use Delivery Optimization and content design intentionally for bandwidth-heavy deployments.
 - Build versioned app baselines so rollback and supersedence remain predictable.
 
+### App Deployment Decision Matrix
+
+| App Type | Best Fit | Operational Strength | Common Risk |
+| --- | --- | --- | --- |
+| Win32 app | Complex installers, custom detection, dependency chains | Maximum control over install, detection, and supersedence | Packaging quality issues can create broad deployment failures |
+| Microsoft Store app (new) | Modern apps with vendor-managed update lifecycle | Lower packaging overhead and cleaner update channel | Weak targeting or assignment intent can create app sprawl |
+| Web link / lightweight app entry | Browser-first tools and low-friction access | Fast delivery with minimal endpoint impact | Can bypass app governance if not cataloged and owned |
+| Script-based install/remediation | Tactical gaps while packaging backlog is being reduced | Fast response for urgent operational need | Long-term script drift if not converted to managed app packages |
+
+Decision guidance:
+
+- Prefer Win32 for business-critical apps that need deterministic install and uninstall behavior.
+- Prefer Store apps where update lifecycle and packaging simplicity are operational priorities.
+- Treat scripts as temporary controls with explicit conversion deadlines.
+
+### Assignment Intent and Targeting Standards
+
+- Define standards for Required, Available, and Uninstall assignment intent before broad rollout.
+- Use device-targeted required assignments for baseline corporate app sets.
+- Use user-targeted available assignments for optional productivity catalogs.
+- Use uninstall intent only with explicit rollback communication and dependency impact review.
+- Keep assignment groups cleanly separated by persona and lifecycle stage (pilot, broad, holdback).
+
+### App Rollout Gates and Rollback
+
+| Gate | Example Threshold | Action if Missed |
+| --- | --- | --- |
+| Pilot install success | >= 97% within agreed pilot window | Pause promotion and run packaging RCA |
+| Detection accuracy | >= 99% detection correctness in pilot | Fix detection logic before broad assignment |
+| Uninstall reliability | >= 95% for managed rollback cohort | Block supersedence promotion until fixed |
+| Help-desk impact | No sustained high-severity ticket spike | Hold rollout and publish mitigation steps |
+
+Use rollout waves for app deployment the same way you use servicing rings. Promotion should stop automatically when failure patterns exceed agreed thresholds.
+
+### Dependency, Supersedence, and Reboot Governance
+
+- Keep dependency chains shallow and documented.
+- Avoid deep supersedence chains that hide retirement and rollback risk.
+- Set an owner and retirement date for every superseded app version.
+- Define restart behavior standards by app criticality and user impact profile.
+- Require user communication and support readiness for forced restart scenarios.
+
 Operational specifics to preserve:
 
 - The Intune Management Extension installs automatically when a Win32 app or a PowerShell script is assigned to a user or device.
@@ -250,6 +368,14 @@ Packaging checklist:
 - Model dependencies explicitly.
 - Use supersedence for version transitions.
 - Document whether installs are device-context or user-context.
+
+### Packaging QA and Release Readiness
+
+- Validate install, detection, and uninstall behavior on representative hardware.
+- Validate upgrade and rollback behavior before broad supersedence assignments.
+- Validate reboot behavior in both interactive and unattended scenarios.
+- Validate Delivery Optimization behavior for remote and bandwidth-constrained locations.
+- Record known failure codes, mitigations, and escalation paths in the app runbook.
 
 ## Update Rings and Feature Updates
 
@@ -456,6 +582,10 @@ Recommended KPIs:
 - Enrollment success rate
 - Compliance rate
 - App deployment success rate
+- App detection mismatch rate
+- App install median time to completion
+- App uninstall success rate
+- App deployment failure-code concentration by package
 - Update latency by ring
 - Security baseline drift
 - Support volume after major policy changes
@@ -557,6 +687,9 @@ Official Microsoft Learn references used to align this guide:
 | RBAC and scope tags | https://learn.microsoft.com/en-us/intune/intune-service/fundamentals/scope-tags |
 | Co-management overview | https://learn.microsoft.com/en-us/intune/configmgr/comanage/overview |
 | Win32 app management, IME behavior, 30 GB limit, and Autopilot caution | https://learn.microsoft.com/en-us/intune/intune-service/apps/apps-win32-app-management |
+| Windows Autopilot overview | https://learn.microsoft.com/en-us/autopilot/windows-autopilot |
+| Windows Autopilot Enrollment Status Page (ESP) | https://learn.microsoft.com/en-us/autopilot/enrollment-status-page |
+| Windows Autopilot pre-provisioning overview | https://learn.microsoft.com/en-us/autopilot/pre-provision |
 | Windows Autopilot device preparation FAQ | https://learn.microsoft.com/en-us/autopilot/device-preparation/faq |
 | Windows feature update policy guidance | https://learn.microsoft.com/en-us/intune/device-updates/windows/feature-update-policy |
 | Device cleanup rules | https://learn.microsoft.com/en-us/intune/governance/device-cleanup-rules |
